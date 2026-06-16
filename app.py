@@ -24,9 +24,9 @@ banco.criar_banco()
 # ── ESTILOS ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] { background-color: #3d3d3d; }
-    [data-testid="stSidebar"] * { color: rgba(255,255,255,0.75) !important; }
-    [data-testid="stSidebar"] .sidebar-title { color: #ff4b4b !important; font-size: 1.1rem; font-weight: 600; }
+    [data-testid="stSidebar"] { background-color: #f5f5f0; }
+    [data-testid="stSidebar"] * { color: rgba(39,42,74,0.75) !important; }
+    [data-testid="stSidebar"] .sidebar-title { color: #c62621 !important; font-size: 1.1rem; font-weight: 600; }
     .metric-box { background: #f8f9fa; border-radius: 8px; padding: 12px 16px; text-align: center; }
     .metric-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
     .metric-val   { font-size: 26px; font-weight: 600; margin-top: 2px; }
