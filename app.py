@@ -24,7 +24,7 @@ banco.criar_banco()
 # ── ESTILOS ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    [data-testid="stSidebar"] { background-color: #272a4a; }
+    [data-testid="stSidebar"] { background-color: #2a2a2a; }
     [data-testid="stSidebar"] * { color: rgba(255,255,255,0.75) !important; }
     [data-testid="stSidebar"] .sidebar-title { color: #ff4b4b !important; font-size: 1.1rem; font-weight: 600; }
     .metric-box { background: #f8f9fa; border-radius: 8px; padding: 12px 16px; text-align: center; }
