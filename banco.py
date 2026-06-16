@@ -177,7 +177,16 @@ def salvar_fabrica(nome, nome_faturamento, contato="", fab_id=None):
 
 
 def deletar_fabrica(fab_id):
-    _run("DELETE FROM fabricas WHERE id=%s", (fab_id,))
+    conn = conectar()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM faturamento WHERE produto_id IN (SELECT id FROM produtos WHERE fabrica_id=%s)", (fab_id,))
+            cur.execute("DELETE FROM codigos_rede WHERE produto_id IN (SELECT id FROM produtos WHERE fabrica_id=%s)", (fab_id,))
+            cur.execute("DELETE FROM produtos WHERE fabrica_id=%s", (fab_id,))
+            cur.execute("DELETE FROM fabricas WHERE id=%s", (fab_id,))
+    finally:
+        conn.close()
 
 
 # ── REDES ─────────────────────────────────────────────────────────────────────
@@ -197,10 +206,16 @@ def salvar_rede(nome, filtro_nome, estados, excluir_palavras="", rede_id=None):
 
 
 def deletar_rede(rede_id):
-    _run("DELETE FROM faturamento WHERE loja_id IN (SELECT id FROM lojas WHERE rede_id=%s)", (rede_id,))
-    _run("DELETE FROM codigos_rede WHERE rede_id=%s", (rede_id,))
-    _run("DELETE FROM lojas WHERE rede_id=%s", (rede_id,))
-    _run("DELETE FROM redes WHERE id=%s", (rede_id,))
+    conn = conectar()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM faturamento WHERE loja_id IN (SELECT id FROM lojas WHERE rede_id=%s)", (rede_id,))
+            cur.execute("DELETE FROM codigos_rede WHERE rede_id=%s", (rede_id,))
+            cur.execute("DELETE FROM lojas WHERE rede_id=%s", (rede_id,))
+            cur.execute("DELETE FROM redes WHERE id=%s", (rede_id,))
+    finally:
+        conn.close()
 
 
 # ── PRODUTOS ──────────────────────────────────────────────────────────────────
