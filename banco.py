@@ -5,10 +5,20 @@ Compartilhar NE — Dados Representadas
 import psycopg2
 import psycopg2.extras
 import streamlit as st
+import urllib.parse
 
 
 def conectar():
-    conn = psycopg2.connect(st.secrets["database"]["url"])
+    url = st.secrets["database"]["url"]
+    r = urllib.parse.urlparse(url)
+    conn = psycopg2.connect(
+        host=r.hostname,
+        port=r.port or 5432,
+        database=r.path.lstrip("/"),
+        user=r.username,
+        password=r.password,
+        sslmode="require",
+    )
     return conn
 
 
