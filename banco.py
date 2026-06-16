@@ -196,7 +196,16 @@ def salvar_rede(nome, filtro_nome, estados, excluir_palavras="", rede_id=None):
 
 
 def deletar_rede(rede_id):
-    _run("DELETE FROM redes WHERE id=%s", (rede_id,))
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM faturamento WHERE loja_id IN (SELECT id FROM lojas WHERE rede_id=%s)", (rede_id,))
+            cur.execute("DELETE FROM codigos_rede WHERE rede_id=%s", (rede_id,))
+            cur.execute("DELETE FROM lojas WHERE rede_id=%s", (rede_id,))
+            cur.execute("DELETE FROM redes WHERE id=%s", (rede_id,))
+        conn.commit()
+    finally:
+        conn.close()
 
 
 # ── PRODUTOS ──────────────────────────────────────────────────────────────────

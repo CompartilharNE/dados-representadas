@@ -271,9 +271,12 @@ elif pagina == "🏪 Redes / Clientes":
                     st.warning("Preencha nome e filtro.")
         with c2:
             if r_edit and st.button("🗑️ Excluir rede", use_container_width=True):
-                banco.deletar_rede(r_edit["id"])
-                st.success("Excluído.")
-                st.rerun()
+                try:
+                    banco.deletar_rede(r_edit["id"])
+                    st.success("Excluído.")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Erro ao excluir: {e}")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
