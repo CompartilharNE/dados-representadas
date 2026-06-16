@@ -125,36 +125,37 @@ def criar_banco():
                 )
             """)
 
-            # Pre-popular fabricas
-            fabricas = [
-                ("Quata", "Nova Mix"),
-                ("Allfood/Granarolo", "Allfood"),
-                ("Bufalissima", "Bufalissima"),
-                ("Prieto", "Prieto"),
-                ("Sao Vicente", "Sao Vicente"),
-                ("Villa Germania", "Villa Germania"),
-            ]
-            for nome, nome_fat in fabricas:
-                cur.execute(
-                    "INSERT INTO fabricas (nome, nome_faturamento) VALUES (%s, %s) ON CONFLICT (nome) DO NOTHING",
-                    (nome, nome_fat)
-                )
+            # Só popula dados iniciais se as tabelas estiverem vazias (primeiro uso)
+            cur.execute("SELECT COUNT(*) FROM fabricas")
+            if cur.fetchone()[0] == 0:
+                fabricas = [
+                    ("Quata", "Nova Mix"),
+                    ("Allfood/Granarolo", "Allfood"),
+                    ("Bufalissima", "Bufalissima"),
+                    ("Prieto", "Prieto"),
+                    ("Sao Vicente", "Sao Vicente"),
+                    ("Villa Germania", "Villa Germania"),
+                ]
+                for nome, nome_fat in fabricas:
+                    cur.execute(
+                        "INSERT INTO fabricas (nome, nome_faturamento) VALUES (%s, %s) ON CONFLICT (nome) DO NOTHING",
+                        (nome, nome_fat)
+                    )
 
-            # Pre-popular redes
-            redes = [
-                ("Atacadao PE", "Atacadao", "PE,PB,RN,AL", "atacado da carne,atacadao canela,garibaldi"),
-                ("Atacadao BA", "Atacadao", "BA,SE",        "atacado da carne,atacadao canela,garibaldi"),
-                ("Assai",       "Assai",    "",              ""),
-                ("GBarbosa",    "GBarbosa", "",              ""),
-                ("Hiper Bomprecо", "Bomprecо", "",          ""),
-                ("Carrefour",   "Carrefour", "",             ""),
-                ("Extra",       "Extra",    "",              ""),
-            ]
-            for nome, filtro, estados, excluir in redes:
-                cur.execute(
-                    "INSERT INTO redes (nome, filtro_nome, estados, excluir_palavras) VALUES (%s, %s, %s, %s) ON CONFLICT (nome) DO NOTHING",
-                    (nome, filtro, estados, excluir)
-                )
+            cur.execute("SELECT COUNT(*) FROM redes")
+            if cur.fetchone()[0] == 0:
+                redes_iniciais = [
+                    ("Atacadao PE", "Atacadao", "PE,PB,RN,AL", "atacado da carne,atacadao canela,garibaldi"),
+                    ("Atacadao BA", "Atacadao", "BA,SE",        "atacado da carne,atacadao canela,garibaldi"),
+                    ("Assai",       "Assai",    "",              ""),
+                    ("GBarbosa",    "GBarbosa", "",              ""),
+                    ("Carrefour",   "Carrefour", "",             ""),
+                ]
+                for nome, filtro, estados, excluir in redes_iniciais:
+                    cur.execute(
+                        "INSERT INTO redes (nome, filtro_nome, estados, excluir_palavras) VALUES (%s, %s, %s, %s) ON CONFLICT (nome) DO NOTHING",
+                        (nome, filtro, estados, excluir)
+                    )
         conn.commit()
     finally:
         conn.close()
