@@ -40,7 +40,8 @@ st.markdown("""
 
 # ── NAVEGAÇÃO SIDEBAR ─────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown('<div class="sidebar-title">📊 Dados Representadas</div>', unsafe_allow_html=True)
+    st.image("compartilhar_logo.svg", use_container_width=True)
+    st.markdown('<div class="sidebar-title" style="margin-top:6px">📊 Dados Representadas</div>', unsafe_allow_html=True)
     st.markdown('<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:12px">Compartilhar NE</div>', unsafe_allow_html=True)
 
     pagina = st.radio(
