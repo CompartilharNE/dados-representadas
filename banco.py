@@ -5,18 +5,21 @@ Compartilhar NE — Dados Representadas
 import psycopg2
 import psycopg2.extras
 import streamlit as st
-import urllib.parse
+
+# Parametros fixos do Supabase Transaction Pooler
+_DB_HOST = "aws-1-us-east-1.pooler.supabase.com"
+_DB_PORT = 6543
+_DB_NAME = "postgres"
+_DB_USER = "postgres.qepdafhofbbuooinkieh"
 
 
 def conectar():
-    url = st.secrets["database"]["url"]
-    r = urllib.parse.urlparse(url)
     conn = psycopg2.connect(
-        host=r.hostname,
-        port=r.port or 5432,
-        database=r.path.lstrip("/"),
-        user=r.username,
-        password=r.password,
+        host=_DB_HOST,
+        port=_DB_PORT,
+        database=_DB_NAME,
+        user=_DB_USER,
+        password=st.secrets["database"]["password"],
         sslmode="require",
     )
     return conn
