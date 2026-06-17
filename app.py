@@ -141,9 +141,8 @@ if pagina == "🗂️ Gerar Relatório":
                 st.markdown("")
 
                 nome_arquivo = (
-                    f"DadosRepresentadas_{fab_sel.replace('/', '-')}_"
-                    f"{'-'.join(r.replace('/', '-').replace(' ', '') for r in redes_sel)}_"
-                    f"{d_ini.strftime('%Y%m%d')}_{d_fim.strftime('%Y%m%d')}.xlsx"
+                    f"Dados Representadas {fab_sel} - "
+                    f"{', '.join(redes_sel)}.xlsx"
                 )
                 st.download_button(
                     label="⬇️ Baixar Excel",

@@ -277,37 +277,52 @@ def _criar_resumo(wb, periodo, resultados):
         linha += 1
 
         # Linhas de loja (outline 1, colapsadas)
+        n_cat = res["n_cat"]
         for k, loja in enumerate(res.get("lojas", [])):
             bg_l = cor_l1 if k % 2 == 0 else cor_l2
+            n_comp_loja = loja.get("n_produtos", 0)
+            n_nc_loja   = max(0, n_cat - n_comp_loja)
+            porc_loja   = round(n_comp_loja / n_cat * 100, 1) if n_cat else 0
+
             ws.merge_cells(f"A{linha}:C{linha}")
             c_ = ws.cell(linha, 1, f"    ↳ {loja['nome_faturamento']}")
             c_.font = _fnt(size=9, italic=True, color=cor_det)
             c_.border = _borda
             c_.alignment = Alignment(horizontal="left", vertical="center")
             c_.fill = _fill(bg_l)
+
+            for j_blank in range(2, 10):
+                ws.cell(linha, j_blank).fill = _fill(bg_l)
+                ws.cell(linha, j_blank).border = _borda
+
             ws.cell(linha, 4).value = loja.get("estado", "")
             ws.cell(linha, 4).font = _fnt(size=9, bold=True, color=cor_det)
-            ws.cell(linha, 4).border = _borda
-            ws.cell(linha, 4).fill = _fill(bg_l)
             ws.cell(linha, 4).alignment = Alignment(horizontal="center", vertical="center")
-            ws.cell(linha, 5).value = loja.get("n_produtos", 0)
-            ws.cell(linha, 5).font = _fnt(size=9, color=cor_det)
-            ws.cell(linha, 5).border = _borda
-            ws.cell(linha, 5).fill = _fill(bg_l)
+
+            ws.cell(linha, 5).value = n_comp_loja
+            ws.cell(linha, 5).font = _fnt(size=9, color="375623")
             ws.cell(linha, 5).alignment = Alignment(horizontal="center", vertical="center")
+
+            ws.cell(linha, 6).value = n_nc_loja
+            ws.cell(linha, 6).font = _fnt(size=9, color="9C0006" if n_nc_loja > 0 else cor_det)
+            ws.cell(linha, 6).alignment = Alignment(horizontal="center", vertical="center")
+
+            ws.cell(linha, 7).value = f"{porc_loja}%"
+            ws.cell(linha, 7).font = _fnt(size=9, color=cor_det)
+            ws.cell(linha, 7).alignment = Alignment(horizontal="center", vertical="center")
+
             ws.cell(linha, 8).value = loja.get("valor_total", 0)
             ws.cell(linha, 8).number_format = "R$ #,##0.00"
             ws.cell(linha, 8).font = _fnt(size=9, color=cor_det)
-            ws.cell(linha, 8).border = _borda
-            ws.cell(linha, 8).fill = _fill(bg_l)
             ws.cell(linha, 8).alignment = Alignment(horizontal="right", vertical="center")
-            for j in [6, 7, 9]:
-                ws.cell(linha, j).fill = _fill(bg_l)
-                ws.cell(linha, j).border = _borda
+
             ws.row_dimensions[linha].height = 15
             ws.row_dimensions[linha].outline_level = 1
             ws.row_dimensions[linha].hidden = True
             linha += 1
+
+    # AutoFilter na linha de cabeçalho (colunas A–I, só nas linhas de rede)
+    ws.auto_filter.ref = f"A4:I4"
 
     for col, w in zip("ABCDEFGHI", [22, 26, 16, 12, 11, 11, 11, 18, 14]):
         ws.column_dimensions[col].width = w
@@ -353,17 +368,21 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
         if not prods_cat:
             continue
 
-        vendas = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
-        lojas  = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
+        vendas  = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
+        lojas   = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
+        precos  = banco.ultimos_precos(fab["id"], rede["id"])
 
         comprados = []
         nao_comprados = []
         for p in prods_cat:
             vd = vendas.get(p["id"])
+            preco_fat = precos.get(p["id"])
+            preco_str = f"R$ {preco_fat:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".") if preco_fat else ""
+            p_com_preco = {**p, "preco": preco_str}
             if vd and vd["valor_total"] > 0:
-                comprados.append({**p, **vd})
+                comprados.append({**p_com_preco, **vd})
             else:
-                nao_comprados.append(p)
+                nao_comprados.append(p_com_preco)
 
         estados = rede["estados"].replace(",", " / ")
         titulo_aba = f"{fab_nome[:12]} {rede_nome.split()[-1]}"
