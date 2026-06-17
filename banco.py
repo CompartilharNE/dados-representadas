@@ -330,6 +330,7 @@ def salvar_codigo_rede(produto_id, rede_id, codigo_rede, ativo=1):
 def importar_codigos_rede_df(fabrica_id, rede_id, df):
     conn = conectar()
     n = 0
+    nao_encontrados = []
     try:
         with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             for _, row in df.iterrows():
@@ -347,6 +348,7 @@ def importar_codigos_rede_df(fabrica_id, rede_id, df):
                 )
                 prod = cur.fetchone()
                 if not prod:
+                    nao_encontrados.append(cod_fab_norm)
                     continue
                 cur.execute("""
                     INSERT INTO codigos_rede (produto_id, rede_id, codigo_rede)
@@ -357,7 +359,7 @@ def importar_codigos_rede_df(fabrica_id, rede_id, df):
         conn.commit()
     finally:
         conn.close()
-    return n
+    return n, nao_encontrados
 
 
 # ── LOJAS ─────────────────────────────────────────────────────────────────────

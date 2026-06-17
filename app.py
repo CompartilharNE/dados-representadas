@@ -499,8 +499,18 @@ elif pagina == "🔢 Códigos da Rede":
                     ]
                     st.caption(f"{len(df_para_import)} pares válidos encontrados.")
                     if st.button("✅ Confirmar importação dos códigos", use_container_width=True):
-                        n = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_para_import)
-                        st.success(f"{n} códigos importados/atualizados.")
+                        n, nao_enc = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_para_import)
+                        if n > 0:
+                            st.success(f"{n} códigos importados/atualizados.")
+                        if nao_enc:
+                            st.warning(
+                                f"{len(nao_enc)} produto(s) não encontrado(s) no catálogo de {fab_sel} "
+                                f"— importe o catálogo primeiro na aba **Produtos**.\n\n"
+                                f"Códigos não encontrados: {', '.join(nao_enc[:10])}"
+                                + (" ..." if len(nao_enc) > 10 else "")
+                            )
+                        if n == 0 and not nao_enc:
+                            st.info("Nenhum par código-produto encontrado. Verifique o mapeamento de colunas.")
                         st.rerun()
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
