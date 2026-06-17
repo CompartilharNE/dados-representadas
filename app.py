@@ -660,6 +660,13 @@ elif pagina == "📥 Importar Faturamento":
     else:
         st.info("Nenhuma importacao realizada ainda.")
 
+    with st.expander("🔍 Diagnóstico — o que está no banco"):
+        diag = banco.diagnostico_faturamento()
+        if diag:
+            st.dataframe(pd.DataFrame(diag), use_container_width=True, hide_index=True)
+        else:
+            st.warning("Nenhum registro de faturamento encontrado no banco — verifique se a importação está gravando.")
+
     with st.expander("Limpar todos os dados de faturamento"):
         st.warning("Isso apaga TODOS os lancamentos de faturamento do banco. Os catalogos e codigos nao sao afetados.")
         confirm = st.text_input("Digite CONFIRMAR para apagar:")

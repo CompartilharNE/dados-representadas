@@ -418,6 +418,26 @@ def limpar_faturamento_arquivo(arquivo):
     _run("DELETE FROM faturamento WHERE arquivo_origem=%s", (arquivo,))
 
 
+def diagnostico_faturamento():
+    """Retorna estatísticas do faturamento para diagnóstico."""
+    rows = _fetch("""
+        SELECT fab.nome as fabrica, r.nome as rede,
+               COUNT(*) as registros,
+               SUM(f.valor_total) as valor_total,
+               MIN(f.data_pedido) as data_min,
+               MAX(f.data_pedido) as data_max,
+               f.arquivo_origem
+        FROM faturamento f
+        JOIN produtos p ON p.id = f.produto_id
+        JOIN fabricas fab ON fab.id = p.fabrica_id
+        JOIN lojas l ON l.id = f.loja_id
+        JOIN redes r ON r.id = l.rede_id
+        GROUP BY fab.nome, r.nome, f.arquivo_origem
+        ORDER BY fab.nome, r.nome
+    """)
+    return [dict(r) for r in rows]
+
+
 def limpar_todo_faturamento():
     conn = conectar()
     try:
