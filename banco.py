@@ -487,6 +487,22 @@ def produtos_com_codigos(fabrica_id, rede_id):
     return [dict(r) for r in rows]
 
 
+def ultimos_precos(fabrica_id, rede_id):
+    """Retorna o último preço unitário faturado por produto_id para a rede."""
+    rows = _fetch("""
+        SELECT DISTINCT ON (f.produto_id)
+            f.produto_id,
+            ROUND((f.valor_total / NULLIF(f.qtd_vendida, 0))::numeric, 2) as preco_unitario
+        FROM faturamento f
+        JOIN lojas l ON l.id = f.loja_id
+        WHERE l.rede_id = %s
+          AND f.produto_id IN (SELECT id FROM produtos WHERE fabrica_id = %s)
+          AND f.qtd_vendida > 0
+        ORDER BY f.produto_id, f.data_pedido DESC, f.id DESC
+    """, (rede_id, fabrica_id))
+    return {r["produto_id"]: float(r["preco_unitario"]) for r in rows if r["preco_unitario"]}
+
+
 def vendas_por_produto(fabrica_id, rede_id, data_inicio, data_fim):
     rows = _fetch("""
         SELECT f.produto_id,
