@@ -318,7 +318,6 @@ elif pagina == "📦 Produtos":
                 "Peso CX":   p["peso"] or "—",
                 "Qtde CX":   p["qtde_cx"] or "—",
                 "UND":       p["und"] or "—",
-                "Preço":     p["preco"] or "—",
             } for p in prods])
             st.dataframe(df, use_container_width=True, hide_index=True, height=300)
             st.caption(f"{len(prods)} produtos cadastrados para {fab_sel}")
@@ -326,42 +325,43 @@ elif pagina == "📦 Produtos":
             st.info(f"Nenhum produto cadastrado para {fab_sel}. Importe o catálogo abaixo.")
 
         st.markdown("---")
-        # Seletor para editar produto existente ou criar novo
-        opcoes_prod = {"➕ Novo produto": None}
-        if prods:
-            for p in prods:
-                opcoes_prod[f"{p['codigo_fab']} — {p['nome']}"] = p
-        prod_sel_key = st.selectbox("Cadastrar / editar produto", list(opcoes_prod.keys()), key="prod_edit_sel")
-        p_edit = opcoes_prod[prod_sel_key]
+        with st.expander("✏️ Cadastrar / Editar / Excluir produto", expanded=False):
+            # Seletor para editar produto existente ou criar novo
+            opcoes_prod = {"➕ Novo produto": None}
+            if prods:
+                for p in prods:
+                    opcoes_prod[f"{p['codigo_fab']} — {p['nome']}"] = p
+            prod_sel_key = st.selectbox("Selecione o produto", list(opcoes_prod.keys()), key="prod_edit_sel")
+            p_edit = opcoes_prod[prod_sel_key]
 
-        with st.form("form_produto"):
-            fc1, fc2 = st.columns(2)
-            cod_in  = fc1.text_input("Código *", value=p_edit["codigo_fab"] if p_edit else "")
-            nome_in = fc2.text_input("Nome *",   value=p_edit["nome"] if p_edit else "")
-            fc3, fc4, fc5, fc6 = st.columns(4)
-            fam_in   = fc3.text_input("Família",  value=p_edit["familia"]  or "" if p_edit else "")
-            peso_in  = fc4.text_input("Peso CX",  value=p_edit["peso"]     or "" if p_edit else "")
-            qtd_in   = fc5.text_input("Qtde CX",  value=p_edit["qtde_cx"] or "" if p_edit else "")
-            und_in   = fc6.text_input("UND",       value=p_edit["und"]      or "" if p_edit else "")
+            with st.form("form_produto"):
+                fc1, fc2 = st.columns(2)
+                cod_in  = fc1.text_input("Código *", value=p_edit["codigo_fab"] if p_edit else "")
+                nome_in = fc2.text_input("Nome *",   value=p_edit["nome"] if p_edit else "")
+                fc3, fc4, fc5, fc6 = st.columns(4)
+                fam_in   = fc3.text_input("Família",  value=p_edit["familia"]  or "" if p_edit else "")
+                peso_in  = fc4.text_input("Peso CX",  value=p_edit["peso"]     or "" if p_edit else "")
+                qtd_in   = fc5.text_input("Qtde CX",  value=p_edit["qtde_cx"] or "" if p_edit else "")
+                und_in   = fc6.text_input("UND",       value=p_edit["und"]      or "" if p_edit else "")
 
-            sb1, sb2 = st.columns([3, 1])
-            salvar = sb1.form_submit_button("💾 Salvar produto", use_container_width=True)
-            excluir = sb2.form_submit_button("🗑️ Excluir", use_container_width=True) if p_edit else False
+                sb1, sb2 = st.columns([3, 1])
+                salvar  = sb1.form_submit_button("💾 Salvar produto", use_container_width=True)
+                excluir = sb2.form_submit_button("🗑️ Excluir", use_container_width=True) if p_edit else False
 
-            if salvar:
-                if cod_in and nome_in:
-                    banco.salvar_produto(fab["id"], cod_in, nome_in, fam_in, peso_in, qtd_in, und_in, "")
-                    st.success("Produto salvo!")
-                    st.rerun()
-                else:
-                    st.warning("Código e Nome são obrigatórios.")
-            if excluir and p_edit:
-                try:
-                    banco._run("DELETE FROM produtos WHERE id=%s", (p_edit["id"],))
-                    st.success("Produto excluído.")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Erro: {e} — verifique se há códigos de rede ou faturamento vinculados.")
+                if salvar:
+                    if cod_in and nome_in:
+                        banco.salvar_produto(fab["id"], cod_in, nome_in, fam_in, peso_in, qtd_in, und_in, "")
+                        st.success("Produto salvo!")
+                        st.rerun()
+                    else:
+                        st.warning("Código e Nome são obrigatórios.")
+                if excluir and p_edit:
+                    try:
+                        banco._run("DELETE FROM produtos WHERE id=%s", (p_edit["id"],))
+                        st.success("Produto excluído.")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Erro: {e} — verifique se há códigos de rede ou faturamento vinculados.")
 
     st.markdown("---")
     st.markdown("**Importar catálogo (.xlsx)**")
