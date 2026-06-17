@@ -370,13 +370,16 @@ elif pagina == "📦 Produtos":
     arq = st.file_uploader("Selecione o arquivo de catálogo", type=["xlsx", "xls"],
                             key="upload_catalogo")
     if arq is not None:
-        st.session_state["_cache_catalogo"] = (arq.name, arq.read())
+        _bytes_cat = arq.read()
+        if _bytes_cat:
+            st.session_state["_cache_catalogo"] = (arq.name, _bytes_cat)
 
-    if "_cache_catalogo" in st.session_state and fab:
-        import io as _io
-        _arq_name, _arq_bytes = st.session_state["_cache_catalogo"]
+    import io as _io
+    _cat_cache = st.session_state.get("_cache_catalogo")
+    if _cat_cache and fab:
+        _arq_name, _arq_bytes = _cat_cache
         if arq is None:
-            st.info(f"📄 Arquivo em cache: **{_arq_name}** — use 🔄 Atualizar para reprocessar ou envie outro arquivo.")
+            st.info(f"📄 Arquivo em cache: **{_arq_name}**")
         try:
             df_raw = pd.read_excel(_io.BytesIO(_arq_bytes), header=None)
 
@@ -493,16 +496,53 @@ elif pagina == "🔢 Códigos da Rede":
         st.markdown("---")
         st.markdown("**Importar mapeamento (.xlsx)**")
         st.caption("Envie qualquer planilha — o sistema detecta as colunas automaticamente e você confirma o mapeamento.")
+
+        import io as _io
+
         arq_cod = st.file_uploader("Selecione a planilha de mapeamento",
                                    type=["xlsx", "xls"], key="upload_codigos")
+        # Atualiza cache somente quando há bytes reais (evita esvaziar no rerun)
         if arq_cod is not None:
-            st.session_state["_cache_codigos"] = (arq_cod.name, arq_cod.read())
+            _bytes_cod = arq_cod.read()
+            if _bytes_cod:
+                st.session_state["_cache_codigos"] = (arq_cod.name, _bytes_cod)
 
-        if "_cache_codigos" in st.session_state:
-            import io as _io
-            _cod_name, _cod_bytes = st.session_state["_cache_codigos"]
-            if arq_cod is None:
-                st.info(f"📄 Arquivo em cache: **{_cod_name}** — use 🔄 Atualizar para reprocessar.")
+        _cod_cache = st.session_state.get("_cache_codigos")
+
+        if _cod_cache:
+            _cod_name, _cod_bytes = _cod_cache
+
+            # Botão de reimportação rápida (se já houver mapeamento salvo)
+            _map_salvo = st.session_state.get("_map_codigos")
+            if _map_salvo and arq_cod is None:
+                st.info(f"📄 **{_cod_name}** em cache  |  Mapeamento salvo: {_map_salvo['fab']} → {_map_salvo['rede']}")
+                if st.button("🔁 Re-importar com mapeamento salvo", use_container_width=True, key="reimp_cod"):
+                    try:
+                        df_ri = pd.read_excel(_io.BytesIO(_cod_bytes), header=None)
+                        # detectar cabeçalho
+                        hr = 0
+                        for ii, rr in df_ri.iterrows():
+                            if any(kw in " ".join(str(v).lower() for v in rr.values)
+                                   for kw in ["cód","cod","código","produto","nome"]):
+                                hr = ii; break
+                        df_ri.columns = [str(c).strip() for c in df_ri.iloc[hr]]
+                        df_ri = df_ri.iloc[hr+1:].reset_index(drop=True).dropna(how="all")
+                        df_pi = pd.DataFrame({
+                            "codigo_fab":  df_ri[_map_salvo["fab"]].astype(str).str.strip(),
+                            "codigo_rede": df_ri[_map_salvo["rede"]].astype(str).str.strip(),
+                        })
+                        df_pi = df_pi[(df_pi["codigo_fab"] != "") & (df_pi["codigo_rede"] != "") &
+                                      (~df_pi["codigo_fab"].isin(["nan","None"])) &
+                                      (~df_pi["codigo_rede"].isin(["nan","None"]))]
+                        n, nao_enc = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_pi)
+                        if n > 0:
+                            st.success(f"✅ {n} códigos reimportados.")
+                        if nao_enc:
+                            st.warning(f"{len(nao_enc)} produto(s) não encontrado(s): {', '.join(nao_enc[:10])}")
+                        st.rerun()
+                    except Exception as _e:
+                        st.error(f"Erro: {_e}")
+
             try:
                 df_raw_cod = pd.read_excel(_io.BytesIO(_cod_bytes), header=None)
                 # Detectar cabeçalho
@@ -539,53 +579,55 @@ elif pagina == "🔢 Códigos da Rede":
                             return col
                     return "(ignorar)"
 
-                st.write(f"**Pré-visualização** ({len(df_cod)} linhas detectadas):")
-                st.dataframe(df_cod.head(5), use_container_width=True)
+                with st.expander(f"📋 Mapeamento de colunas — {_cod_name}", expanded=(arq_cod is not None)):
+                    st.write(f"**Pré-visualização** ({len(df_cod)} linhas detectadas):")
+                    st.dataframe(df_cod.head(5), use_container_width=True)
 
-                st.markdown("**Mapeamento de colunas** — confirme ou ajuste:")
-                cc1, cc2 = st.columns(2)
-                col_cf = cc1.selectbox(
-                    f"Código da Fábrica *",
-                    colunas_cod,
-                    index=colunas_cod.index(_sug_cod(["fab", "fornec", "quata", "allfood", "prieto", "bufa", "sao vic", "villa", "cod fab", "codigo fab"])),
-                    key="map_cod_fab"
-                )
-                col_cr = cc2.selectbox(
-                    f"Código da Rede ({rede_sel}) *",
-                    colunas_cod,
-                    index=colunas_cod.index(_sug_cod(["rede", "cliente", "assai", "atacad", "gbarbosa", "carrefour", "extra", "bomprec", "soberano", "cod rede"])),
-                    key="map_cod_rede"
-                )
+                    st.markdown("**Confirme ou ajuste as colunas:**")
+                    cc1, cc2 = st.columns(2)
+                    col_cf = cc1.selectbox(
+                        "Código da Fábrica *",
+                        colunas_cod,
+                        index=colunas_cod.index(_sug_cod(["fab", "fornec", "quata", "allfood", "prieto", "bufa", "sao vic", "villa", "cod fab", "codigo fab"])),
+                        key="map_cod_fab"
+                    )
+                    col_cr = cc2.selectbox(
+                        f"Código da Rede ({rede_sel}) *",
+                        colunas_cod,
+                        index=colunas_cod.index(_sug_cod(["rede", "cliente", "assai", "atacad", "gbarbosa", "carrefour", "extra", "bomprec", "soberano", "cod rede"])),
+                        key="map_cod_rede"
+                    )
 
-                if col_cf == "(ignorar)" or col_cr == "(ignorar)":
-                    st.warning("Selecione as duas colunas obrigatórias.")
-                else:
-                    # Montar df padronizado para importação
-                    df_para_import = pd.DataFrame({
-                        "codigo_fab":  df_cod[col_cf].astype(str).str.strip(),
-                        "codigo_rede": df_cod[col_cr].astype(str).str.strip(),
-                    })
-                    df_para_import = df_para_import[
-                        (df_para_import["codigo_fab"] != "") &
-                        (df_para_import["codigo_rede"] != "") &
-                        (~df_para_import["codigo_fab"].isin(["nan", "None"])) &
-                        (~df_para_import["codigo_rede"].isin(["nan", "None"]))
-                    ]
-                    st.caption(f"{len(df_para_import)} pares válidos encontrados.")
-                    if st.button("✅ Confirmar importação dos códigos", use_container_width=True):
-                        n, nao_enc = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_para_import)
-                        if n > 0:
-                            st.success(f"{n} códigos importados/atualizados.")
-                        if nao_enc:
-                            st.warning(
-                                f"{len(nao_enc)} produto(s) não encontrado(s) no catálogo de {fab_sel} "
-                                f"— importe o catálogo primeiro na aba **Produtos**.\n\n"
-                                f"Códigos não encontrados: {', '.join(nao_enc[:10])}"
-                                + (" ..." if len(nao_enc) > 10 else "")
-                            )
-                        if n == 0 and not nao_enc:
-                            st.info("Nenhum par código-produto encontrado. Verifique o mapeamento de colunas.")
-                        st.rerun()
+                    if col_cf == "(ignorar)" or col_cr == "(ignorar)":
+                        st.warning("Selecione as duas colunas obrigatórias.")
+                    else:
+                        df_para_import = pd.DataFrame({
+                            "codigo_fab":  df_cod[col_cf].astype(str).str.strip(),
+                            "codigo_rede": df_cod[col_cr].astype(str).str.strip(),
+                        })
+                        df_para_import = df_para_import[
+                            (df_para_import["codigo_fab"] != "") &
+                            (df_para_import["codigo_rede"] != "") &
+                            (~df_para_import["codigo_fab"].isin(["nan", "None"])) &
+                            (~df_para_import["codigo_rede"].isin(["nan", "None"]))
+                        ]
+                        st.caption(f"{len(df_para_import)} pares válidos encontrados.")
+                        if st.button("✅ Confirmar importação dos códigos", use_container_width=True):
+                            n, nao_enc = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_para_import)
+                            # Salva mapeamento para re-importação futura
+                            st.session_state["_map_codigos"] = {"fab": col_cf, "rede": col_cr}
+                            if n > 0:
+                                st.success(f"{n} códigos importados/atualizados.")
+                            if nao_enc:
+                                st.warning(
+                                    f"{len(nao_enc)} produto(s) não encontrado(s) no catálogo de {fab_sel} "
+                                    f"— importe o catálogo primeiro na aba **Produtos**.\n\n"
+                                    f"Códigos não encontrados: {', '.join(nao_enc[:10])}"
+                                    + (" ..." if len(nao_enc) > 10 else "")
+                                )
+                            if n == 0 and not nao_enc:
+                                st.info("Nenhum par código-produto encontrado. Verifique o mapeamento de colunas.")
+                            st.rerun()
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
 
@@ -664,9 +706,12 @@ elif pagina == "📥 Importar Faturamento":
         accept_multiple_files=True,
     )
 
-    # Cache novos uploads; usa cache se nenhum novo foi enviado
+    # Cache novos uploads; só atualiza se bytes não estiverem vazios
     if arqs_fat:
-        st.session_state["_cache_fat"] = [(f.name, f.size, f.read()) for f in arqs_fat]
+        _novos = [(f.name, f.size, f.read()) for f in arqs_fat]
+        _novos = [t for t in _novos if t[2]]  # descarta uploads com bytes vazios (rerun)
+        if _novos:
+            st.session_state["_cache_fat"] = _novos
 
     fat_lista = st.session_state.get("_cache_fat", [])
 
