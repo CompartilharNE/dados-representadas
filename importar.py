@@ -28,7 +28,7 @@ MAPA_ESTADO = {
     "caicó": "RN", "caico": "RN", "mossoró": "RN", "mossoro": "RN",
     "natal": "RN", "parnamirim": "RN", "arapiraca": "AL", "maceió": "AL",
     "maceio": "AL", "alagoinhas": "BA", "barreiras": "BA", "brotas": "BA",
-    "cabula": "BA", "camaçari": "BA", "camacari": "BA", "candeias": "BA",
+    "candeias": "PE", "cabula": "BA", "camaçari": "BA", "camacari": "BA",
     "cosme de farias": "BA", "eunápolis": "BA", "eunapolis": "BA",
     "feira de santana": "BA", "feira morada": "BA", "ilhéus": "BA",
     "ilheus": "BA", "irecê": "BA", "irece": "BA", "itapuã": "BA",
@@ -41,9 +41,13 @@ MAPA_ESTADO = {
 }
 
 
+# Pré-normaliza as chaves do mapa para comparação sem acento
+_MAPA_NORM = {_sem_acento(k): v for k, v in MAPA_ESTADO.items()}
+
+
 def _estado_por_nome(nome):
-    n = nome.lower()
-    for kw, est in MAPA_ESTADO.items():
+    n = _sem_acento(nome)
+    for kw, est in _MAPA_NORM.items():
         if kw in n:
             return est
     return ""
