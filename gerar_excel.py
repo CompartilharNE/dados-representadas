@@ -225,7 +225,7 @@ def _criar_resumo(wb, periodo, resultados):
     ws.merge_cells("A2:J2")
     c = ws["A2"]
     c.value = (f"Período: {periodo}   |   Somente produtos cadastrados na rede   |   "
-               "Clique no + na lateral para ver as lojas")
+               "Clique no + para ver lojas   |   Clique no + da loja para ver produtos")
     c.font = Font(name="Calibri", italic=True, color="595959", size=10)
     c.alignment = Alignment(horizontal="center", vertical="center")
     c.fill = _fill(COR_CINZA)
@@ -321,6 +321,51 @@ def _criar_resumo(wb, periodo, resultados):
             ws.row_dimensions[linha].hidden = True
             linha += 1
 
+            # ── Linhas de produto por loja (outline 2, colapsadas) ────────────
+            prods_loja = res.get("loja_prods", {}).get(loja.get("loja_id"), {})
+            prods_cat  = res.get("prods_cat", [])
+            for p in prods_cat:
+                comprou = p["id"] in prods_loja
+                vd      = prods_loja.get(p["id"], {})
+                bg_p    = "E8F8F5" if comprou else "FDEDEC"
+                cor_p   = "1A5276" if comprou else "922B21"
+                status  = "✓" if comprou else "✗"
+                label   = f"               {status}  [{p.get('codigo_fab','')}]  {p.get('nome','')}"
+
+                ws.merge_cells(f"A{linha}:D{linha}")
+                c_ = ws.cell(linha, 1, label)
+                c_.font      = _fnt(size=8, italic=True, color=cor_p)
+                c_.fill      = _fill(bg_p)
+                c_.border    = _borda
+                c_.alignment = Alignment(horizontal="left", vertical="center")
+
+                for j_b in range(2, 10):
+                    ws.cell(linha, j_b).fill   = _fill(bg_p)
+                    ws.cell(linha, j_b).border = _borda
+
+                # Coluna E: qtd (se comprou)
+                if comprou:
+                    c5 = ws.cell(linha, 5, vd.get("qtd", 0))
+                    c5.font          = _fnt(size=8, color=cor_p)
+                    c5.alignment     = Alignment(horizontal="center", vertical="center")
+                    c5.number_format = "#,##0.0"
+                else:
+                    c6 = ws.cell(linha, 6, "✗")
+                    c6.font      = _fnt(size=8, bold=True, color=cor_p)
+                    c6.alignment = Alignment(horizontal="center", vertical="center")
+
+                # Coluna H: valor (se comprou)
+                if comprou:
+                    c8 = ws.cell(linha, 8, vd.get("valor", 0))
+                    c8.font          = _fnt(size=8, color=cor_p)
+                    c8.alignment     = Alignment(horizontal="right", vertical="center")
+                    c8.number_format = "R$ #,##0.00"
+
+                ws.row_dimensions[linha].height        = 13
+                ws.row_dimensions[linha].outline_level = 2
+                ws.row_dimensions[linha].hidden        = True
+                linha += 1
+
     # AutoFilter na linha de cabeçalho (colunas A–I, só nas linhas de rede)
     ws.auto_filter.ref = f"A4:I4"
 
@@ -368,9 +413,10 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
         if not prods_cat:
             continue
 
-        vendas  = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
-        lojas   = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
-        precos  = banco.ultimos_precos(fab["id"], rede["id"])
+        vendas      = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
+        lojas       = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
+        loja_prods  = banco.vendas_por_loja_produto(fab["id"], rede["id"], data_inicio, data_fim)
+        precos      = banco.ultimos_precos(fab["id"], rede["id"])
 
         comprados = []
         nao_comprados = []
@@ -401,6 +447,8 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             "valor":      valor,
             "titulo_aba": titulo_aba,
             "lojas":      lojas,
+            "loja_prods": loja_prods,
+            "prods_cat":  prods_cat,
         })
 
     if not resultados:

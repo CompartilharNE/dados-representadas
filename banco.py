@@ -525,7 +525,7 @@ def vendas_por_produto(fabrica_id, rede_id, data_inicio, data_fim):
 
 def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
     rows = _fetch("""
-        SELECT l.nome_faturamento, l.estado,
+        SELECT l.id as loja_id, l.nome_faturamento, l.estado,
                SUM(f.valor_total) as valor_total,
                COUNT(DISTINCT f.produto_id) as n_produtos
         FROM faturamento f
@@ -534,7 +534,33 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
           AND f.produto_id IN (SELECT p.id FROM produtos p WHERE p.fabrica_id=%s)
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
-        GROUP BY f.loja_id, l.nome_faturamento, l.estado
+        GROUP BY f.loja_id, l.id, l.nome_faturamento, l.estado
         ORDER BY valor_total DESC
     """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
     return [dict(r) for r in rows]
+
+
+def vendas_por_loja_produto(fabrica_id, rede_id, data_inicio, data_fim):
+    """Retorna dict: loja_id -> {produto_id -> {qtd, valor}}"""
+    rows = _fetch("""
+        SELECT f.loja_id, f.produto_id,
+               SUM(f.qtd_vendida) as qtd,
+               SUM(f.valor_total) as valor
+        FROM faturamento f
+        JOIN lojas l ON l.id = f.loja_id
+        WHERE l.rede_id=%s
+          AND f.produto_id IN (SELECT id FROM produtos WHERE fabrica_id=%s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
+        GROUP BY f.loja_id, f.produto_id
+    """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
+    result = {}
+    for r in rows:
+        lid = r["loja_id"]
+        if lid not in result:
+            result[lid] = {}
+        result[lid][r["produto_id"]] = {
+            "qtd": float(r["qtd"] or 0),
+            "valor": float(r["valor"] or 0),
+        }
+    return result
