@@ -322,10 +322,15 @@ def _criar_resumo(wb, periodo, resultados):
             linha += 1
 
             # ── Linhas de produto por loja (outline 2, colapsadas) ────────────
-            prods_loja = res.get("loja_prods", {}).get(loja.get("loja_id"), {})
-            prods_cat  = res.get("prods_cat", [])
+            prods_loja    = res.get("loja_prods", {}).get(loja.get("loja_id"), {})
+            prods_cat     = res.get("prods_cat", [])
+            ids_comp_rede = res.get("ids_comp_rede", set())
             for p in prods_cat:
-                comprou = p["id"] in prods_loja
+                comprou       = p["id"] in prods_loja
+                rede_comprou  = p["id"] in ids_comp_rede
+                # Mostrar só se a loja comprou OU se a rede comprou (oportunidade real)
+                if not comprou and not rede_comprou:
+                    continue
                 vd      = prods_loja.get(p["id"], {})
                 bg_p    = "E8F8F5" if comprou else "FDEDEC"
                 cor_p   = "1A5276" if comprou else "922B21"
@@ -437,18 +442,20 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             comprados, nao_comprados, usar_familia=True
         )
 
+        ids_comp_rede = {p["id"] for p in comprados}   # produtos que a REDE comprou
         resultados.append({
-            "fab_nome":   fab_nome,
-            "rede_nome":  rede_nome,
-            "estados":    estados,
-            "n_cat":      len(prods_cat),
-            "n_comp":     n_comp,
-            "n_ncomp":    n_nc,
-            "valor":      valor,
-            "titulo_aba": titulo_aba,
-            "lojas":      lojas,
-            "loja_prods": loja_prods,
-            "prods_cat":  prods_cat,
+            "fab_nome":       fab_nome,
+            "rede_nome":      rede_nome,
+            "estados":        estados,
+            "n_cat":          len(prods_cat),
+            "n_comp":         n_comp,
+            "n_ncomp":        n_nc,
+            "valor":          valor,
+            "titulo_aba":     titulo_aba,
+            "lojas":          lojas,
+            "loja_prods":     loja_prods,
+            "prods_cat":      prods_cat,
+            "ids_comp_rede":  ids_comp_rede,
         })
 
     if not resultados:
