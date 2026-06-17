@@ -440,9 +440,21 @@ elif pagina == "🔢 Códigos da Rede":
                         header_row = i
                         break
                 df_cod = df_raw_cod.copy()
-                df_cod.columns = [str(c).strip() for c in df_raw_cod.iloc[header_row]]
+                # Deduplica nomes de colunas
+                raw_cols_cod = [str(c).strip() for c in df_raw_cod.iloc[header_row]]
+                seen_cod = {}
+                dedup_cols_cod = []
+                for c in raw_cols_cod:
+                    if c in seen_cod:
+                        seen_cod[c] += 1
+                        dedup_cols_cod.append(f"{c}_{seen_cod[c]}" if c != "nan" else f"_col{seen_cod[c]}")
+                    else:
+                        seen_cod[c] = 0
+                        dedup_cols_cod.append(c if c != "nan" else f"_col{len(dedup_cols_cod)}")
+                df_cod.columns = dedup_cols_cod
                 df_cod = df_cod.iloc[header_row + 1:].reset_index(drop=True)
                 df_cod = df_cod.dropna(how="all")
+                df_cod = df_cod[[c for c in df_cod.columns if not c.startswith("_col")]]
 
                 colunas_cod = ["(ignorar)"] + list(df_cod.columns)
 
