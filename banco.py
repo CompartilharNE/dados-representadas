@@ -126,6 +126,18 @@ def criar_banco():
                 )
             """)
             cur.execute("""
+                ALTER TABLE redes ADD COLUMN IF NOT EXISTS logo_b64 TEXT DEFAULT ''
+            """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS codigos_fornecedor (
+                    id SERIAL PRIMARY KEY,
+                    fabrica_id INTEGER NOT NULL REFERENCES fabricas(id),
+                    rede_id    INTEGER NOT NULL REFERENCES redes(id),
+                    codigo     TEXT NOT NULL DEFAULT \'\',
+                    UNIQUE(fabrica_id, rede_id)
+                )
+            """)
+            cur.execute("""
                 CREATE TABLE IF NOT EXISTS tabela_precos (
                     id SERIAL PRIMARY KEY,
                     rede_id INTEGER NOT NULL REFERENCES redes(id),
@@ -219,6 +231,38 @@ def salvar_rede(nome, filtro_nome, estados, excluir_palavras="", rede_id=None):
     else:
         _run("INSERT INTO redes (nome, filtro_nome, estados, excluir_palavras) VALUES (%s, %s, %s, %s)",
              (nome, filtro_nome, estados, excluir_palavras))
+
+
+def salvar_logo_rede(rede_id, logo_b64):
+    _run("UPDATE redes SET logo_b64=%s WHERE id=%s", (logo_b64, rede_id))
+
+
+def salvar_cod_fornecedor(fabrica_id, rede_id, codigo):
+    _run("""
+        INSERT INTO codigos_fornecedor (fabrica_id, rede_id, codigo)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (fabrica_id, rede_id)
+        DO UPDATE SET codigo = EXCLUDED.codigo
+    """, (fabrica_id, rede_id, codigo))
+
+
+def get_cod_fornecedor(fabrica_id, rede_id):
+    row = _fetch(
+        "SELECT codigo FROM codigos_fornecedor WHERE fabrica_id=%s AND rede_id=%s",
+        (fabrica_id, rede_id), one=True
+    )
+    return row["codigo"] if row else ""
+
+
+def listar_cods_forn_por_rede(rede_id):
+    rows = _fetch("""
+        SELECT cf.codigo, f.nome as fabrica_nome, cf.fabrica_id
+        FROM codigos_fornecedor cf
+        JOIN fabricas f ON f.id = cf.fabrica_id
+        WHERE cf.rede_id = %s
+        ORDER BY f.nome
+    """, (rede_id,))
+    return [dict(r) for r in rows]
 
 
 def deletar_rede(rede_id):

@@ -6,6 +6,7 @@ Rodar: streamlit run app.py --server.port 8501
 import streamlit as st
 import pandas as pd
 import datetime
+import base64
 import banco
 import gerar_excel
 import importar as imp
@@ -271,12 +272,34 @@ elif pagina == "🏪 Redes / Clientes":
             excluir_in = st.text_input("Palavras a excluir (separadas por vírgula)",
                                        value=r_edit["excluir_palavras"] if r_edit else "")
 
+        st.markdown("**Logo da rede** *(aparecerá na planilha ao lado da logo Compartilhar)*")
+        logo_col1, logo_col2 = st.columns([2, 3])
+        with logo_col1:
+            logo_atual = r_edit.get("logo_b64", "") if r_edit else ""
+            if logo_atual:
+                st.image(base64.b64decode(logo_atual), width=150, caption="Logo atual")
+            else:
+                st.caption("Nenhuma logo cadastrada")
+        with logo_col2:
+            logo_file = st.file_uploader(
+                "Upload logo (PNG, JPG)", type=["png","jpg","jpeg"],
+                key="rede_logo_up", help="Recomendado: fundo branco, aprox. 300×100 px"
+            )
+            if logo_file:
+                st.image(logo_file, width=150, caption="Nova logo (prévia)")
+
         c1, c2 = st.columns([3, 1])
         with c1:
             if st.button("💾 Salvar rede", use_container_width=True):
                 if nome_in and filtro_in:
                     banco.salvar_rede(nome_in, filtro_in, estados_in, excluir_in,
                                       rede_id=r_edit["id"] if r_edit else None)
+                    if logo_file and r_edit:
+                        banco.salvar_logo_rede(r_edit["id"], base64.b64encode(logo_file.getvalue()).decode())
+                    elif logo_file:
+                        rede_nova = banco.obter_rede_por_nome(nome_in)
+                        if rede_nova:
+                            banco.salvar_logo_rede(rede_nova["id"], base64.b64encode(logo_file.getvalue()).decode())
                     st.success("Salvo!")
                     st.rerun()
                 else:
@@ -289,6 +312,39 @@ elif pagina == "🏪 Redes / Clientes":
                     st.rerun()
                 except Exception as e:
                     st.error(f"Erro ao excluir: {e}")
+
+    st.markdown("---")
+    st.subheader("🔑 Código de Fornecedor por Fábrica")
+    st.caption("Cada fábrica pode ter um código de fornecedor diferente para cada rede. Este código aparece na planilha.")
+
+    fabricas_all = banco.listar_fabricas()
+    redes_cf     = banco.listar_redes()
+    cf_col1, _ = st.columns(2)
+    with cf_col1:
+        rede_cf = st.selectbox("Rede / Cliente", [r["nome"] for r in redes_cf], key="cf_rede")
+    rede_cf_obj = next((r for r in redes_cf if r["nome"] == rede_cf), None)
+
+    if rede_cf_obj:
+        cods_existentes = {c["fabrica_id"]: c["codigo"] for c in banco.listar_cods_forn_por_rede(rede_cf_obj["id"])}
+        rows_cf = [{"Fábrica": f["nome"], "Código Fornecedor": cods_existentes.get(f["id"], "—")} for f in fabricas_all]
+        st.dataframe(pd.DataFrame(rows_cf), use_container_width=True, hide_index=True)
+
+        cf2, cf3, cf4 = st.columns([2, 2, 1])
+        with cf2:
+            fab_cf = st.selectbox("Fábrica", [f["nome"] for f in fabricas_all], key="cf_fab")
+        with cf3:
+            fab_cf_obj = next((f for f in fabricas_all if f["nome"] == fab_cf), None)
+            val_atual  = cods_existentes.get(fab_cf_obj["id"], "") if fab_cf_obj else ""
+            cod_in = st.text_input("Código do Fornecedor", value=val_atual, key="cf_cod")
+        with cf4:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("💾 Salvar", key="cf_salvar", use_container_width=True):
+                if fab_cf_obj and cod_in.strip():
+                    banco.salvar_cod_fornecedor(fab_cf_obj["id"], rede_cf_obj["id"], cod_in.strip())
+                    st.success("Código salvo!")
+                    st.rerun()
+                else:
+                    st.warning("Preencha o código.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════
