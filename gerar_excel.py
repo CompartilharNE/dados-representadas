@@ -662,19 +662,28 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
         if not prods_cat:
             continue
 
-        vendas     = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
-        lojas      = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
-        loja_prods = banco.vendas_por_loja_produto(fab["id"], rede["id"], data_inicio, data_fim)
-        precos     = banco.ultimos_precos(fab["id"], rede["id"])
+        vendas      = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
+        lojas       = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
+        loja_prods  = banco.vendas_por_loja_produto(fab["id"], rede["id"], data_inicio, data_fim)
+        precos_fat  = banco.ultimos_precos(fab["id"], rede["id"])
+        tab_prec    = banco.precos_tabela(rede["id"], fab["id"])
+
+        def _fmt_preco(v):
+            return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
         comprados = []
         nao_comprados = []
         for p in prods_cat:
             vd = vendas.get(p["id"])
-            preco_fat = precos.get(p["id"])
-            preco_str = (f"R$ {preco_fat:,.2f}".replace(",", "X")
-                         .replace(".", ",").replace("X", ".")) if preco_fat else ""
-            p_com_preco = {**p, "preco": preco_str}
+            if p["id"] in tab_prec:
+                tp        = tab_prec[p["id"]]
+                preco_str = _fmt_preco(tp["preco"]) if tp["preco"] else ""
+                und_final = tp["unidade"] if tp["unidade"] else p.get("und", "")
+            else:
+                preco_fat = precos_fat.get(p["id"])
+                preco_str = _fmt_preco(preco_fat) if preco_fat else ""
+                und_final = p.get("und", "")
+            p_com_preco = {**p, "preco": preco_str, "und": und_final}
             if vd and vd["valor_total"] > 0:
                 comprados.append({**p_com_preco, **vd})
             else:

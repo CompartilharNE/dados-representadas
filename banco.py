@@ -125,6 +125,20 @@ def criar_banco():
                     status TEXT DEFAULT 'ok'
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS tabela_precos (
+                    id SERIAL PRIMARY KEY,
+                    rede_id INTEGER NOT NULL REFERENCES redes(id),
+                    fabrica_id INTEGER NOT NULL REFERENCES fabricas(id),
+                    produto_id INTEGER REFERENCES produtos(id),
+                    codigo_fab TEXT NOT NULL,
+                    descricao TEXT DEFAULT \'\',
+                    unidade TEXT DEFAULT \'\',
+                    preco NUMERIC(12,4) DEFAULT 0,
+                    data_atualizacao TIMESTAMP DEFAULT NOW(),
+                    UNIQUE(rede_id, fabrica_id, codigo_fab)
+                )
+            """)
 
             # Só popula dados iniciais se as tabelas estiverem vazias (primeiro uso)
             cur.execute("SELECT COUNT(*) FROM fabricas")
@@ -538,6 +552,82 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
         ORDER BY valor_total DESC
     """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
     return [dict(r) for r in rows]
+
+
+
+# ── TABELA DE PREÇOS ─────────────────────────────────────────────────────────
+
+def salvar_tabela_precos(rede_id, fabrica_id, items):
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute(
+                "DELETE FROM tabela_precos WHERE rede_id=%s AND fabrica_id=%s",
+                (rede_id, fabrica_id)
+            )
+            for it in items:
+                cur.execute(
+                    "SELECT id FROM produtos WHERE fabrica_id=%s AND codigo_fab=%s LIMIT 1",
+                    (fabrica_id, str(it["codigo_fab"]).strip())
+                )
+                row = cur.fetchone()
+                produto_id = row[0] if row else None
+                cur.execute("""
+                    INSERT INTO tabela_precos
+                        (rede_id, fabrica_id, produto_id, codigo_fab, descricao, unidade, preco)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s)
+                    ON CONFLICT (rede_id, fabrica_id, codigo_fab)
+                    DO UPDATE SET produto_id=EXCLUDED.produto_id,
+                                  descricao=EXCLUDED.descricao,
+                                  unidade=EXCLUDED.unidade,
+                                  preco=EXCLUDED.preco,
+                                  data_atualizacao=NOW()
+                """, (
+                    rede_id, fabrica_id, produto_id,
+                    str(it["codigo_fab"]).strip(),
+                    str(it.get("descricao", "") or ""),
+                    str(it.get("unidade", "") or ""),
+                    float(it.get("preco", 0) or 0),
+                ))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def obter_tabela_precos(rede_id, fabrica_id):
+    rows = _fetch("""
+        SELECT tp.codigo_fab, tp.descricao, tp.unidade,
+               tp.preco, tp.data_atualizacao,
+               p.nome as produto_nome
+        FROM tabela_precos tp
+        LEFT JOIN produtos p ON p.id = tp.produto_id
+        WHERE tp.rede_id=%s AND tp.fabrica_id=%s
+        ORDER BY tp.codigo_fab
+    """, (rede_id, fabrica_id))
+    return [dict(r) for r in rows]
+
+
+def precos_tabela(rede_id, fabrica_id):
+    rows = _fetch("""
+        SELECT produto_id, preco, unidade
+        FROM tabela_precos
+        WHERE rede_id=%s AND fabrica_id=%s
+          AND produto_id IS NOT NULL
+    """, (rede_id, fabrica_id))
+    return {
+        r["produto_id"]: {
+            "preco": float(r["preco"] or 0),
+            "unidade": str(r["unidade"] or ""),
+        }
+        for r in rows
+    }
+
+
+def limpar_tabela_precos(rede_id, fabrica_id):
+    _run(
+        "DELETE FROM tabela_precos WHERE rede_id=%s AND fabrica_id=%s",
+        (rede_id, fabrica_id)
+    )
 
 
 def vendas_por_loja_produto(fabrica_id, rede_id, data_inicio, data_fim):

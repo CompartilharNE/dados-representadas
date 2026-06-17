@@ -47,7 +47,8 @@ with st.sidebar:
     pagina = st.radio(
         "Navegação",
         ["🗂️ Gerar Relatório", "🏭 Fábricas", "🏪 Redes / Clientes",
-         "📦 Produtos", "🔢 Códigos da Rede", "📥 Importar Faturamento"],
+         "📦 Produtos", "🔢 Códigos da Rede", "💰 Tabela de Preço",
+         "📥 Importar Faturamento"],
         label_visibility="collapsed",
     )
     st.markdown("---")
@@ -645,6 +646,146 @@ elif pagina == "🔢 Códigos da Rede":
                         st.rerun()
             else:
                 st.info("Importe o catálogo da fábrica primeiro.")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PÁGINA: TABELA DE PREÇO
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == "💰 Tabela de Preço":
+    st.title("Tabela de Preço por Rede / Cliente")
+    st.caption(
+        "Importe a tabela de preços negociada com cada cliente. "
+        "O sistema usará o preço e a unidade (PC, CX, KG) desta tabela ao gerar o relatório Excel."
+    )
+
+    fabricas = banco.listar_fabricas()
+    redes    = banco.listar_redes()
+
+    col1, col2 = st.columns(2)
+    with col1:
+        fab_sel  = st.selectbox("Fábrica", [f["nome"] for f in fabricas], key="tp_fab")
+    with col2:
+        rede_sel = st.selectbox("Rede / Cliente", [r["nome"] for r in redes], key="tp_rede")
+
+    fab_obj  = next((f for f in fabricas if f["nome"] == fab_sel), None)
+    rede_obj = next((r for r in redes    if r["nome"] == rede_sel), None)
+
+    if fab_obj and rede_obj:
+        tab_atual = banco.obter_tabela_precos(rede_obj["id"], fab_obj["id"])
+
+        if tab_atual:
+            st.markdown(f"**{len(tab_atual)} itens cadastrados** — {rede_sel} × {fab_sel}")
+            df_atual = pd.DataFrame([{
+                "Cód. Fab":   r["codigo_fab"],
+                "Produto":    r["produto_nome"] or r["descricao"] or "—",
+                "Unidade":    r["unidade"] or "—",
+                "Preço (R$)": f"R$ {float(r['preco']):,.2f}".replace(",", "X").replace(".", ",").replace("X", "."),
+                "Vinculado":  "✅" if r["produto_nome"] else "⚠️ não encontrado",
+            } for r in tab_atual])
+            st.dataframe(df_atual, use_container_width=True, hide_index=True, height=280)
+
+            nao_vinc = sum(1 for r in tab_atual if not r["produto_nome"])
+            if nao_vinc:
+                st.warning(
+                    f"⚠️ {nao_vinc} produto(s) não vinculados — verifique se o Cód. Fab. "
+                    "existe no cadastro de Produtos desta fábrica."
+                )
+        else:
+            st.info("Nenhuma tabela de preços cadastrada para esta combinação. Faça o upload abaixo.")
+
+        st.markdown("---")
+        st.subheader("📂 Importar tabela de preços (.xlsx)")
+        st.markdown(
+            "O arquivo Excel deve ter as colunas de **código da fábrica**, **unidade** e **preço**. "
+            "Após o upload, mapeie as colunas abaixo."
+        )
+
+        arquivo = st.file_uploader("Selecione o arquivo Excel", type=["xlsx", "xls"], key="tp_upload")
+
+        if arquivo:
+            try:
+                df_raw = pd.read_excel(arquivo, dtype=str)
+                df_raw.columns = [str(c).strip() for c in df_raw.columns]
+                st.success(f"Arquivo lido: {len(df_raw)} linhas, colunas: {list(df_raw.columns)}")
+
+                st.markdown("**Mapeamento de colunas:**")
+                cols_disponiveis = ["(não usar)"] + list(df_raw.columns)
+
+                m1, m2, m3, m4 = st.columns(4)
+                with m1:
+                    col_cod  = st.selectbox("Cód. Fab (obrigatório)", cols_disponiveis,
+                                            index=next((i+1 for i, c in enumerate(df_raw.columns)
+                                                        if any(x in c.lower() for x in ["cod","cód","código","codigo","ref"])), 0),
+                                            key="tp_col_cod")
+                with m2:
+                    col_desc = st.selectbox("Descrição / Nome", cols_disponiveis,
+                                            index=next((i+1 for i, c in enumerate(df_raw.columns)
+                                                        if any(x in c.lower() for x in ["desc","nome","produto","item"])), 0),
+                                            key="tp_col_desc")
+                with m3:
+                    col_und  = st.selectbox("Unidade (PC/CX/KG)", cols_disponiveis,
+                                            index=next((i+1 for i, c in enumerate(df_raw.columns)
+                                                        if any(x in c.lower() for x in ["und","unid","unit"])), 0),
+                                            key="tp_col_und")
+                with m4:
+                    col_prec = st.selectbox("Preço", cols_disponiveis,
+                                            index=next((i+1 for i, c in enumerate(df_raw.columns)
+                                                        if any(x in c.lower() for x in ["prec","preço","valor","price"])), 0),
+                                            key="tp_col_prec")
+
+                if col_cod != "(não usar)":
+                    preview_cols = {col_cod: "Cód. Fab"}
+                    if col_desc != "(não usar)": preview_cols[col_desc] = "Descrição"
+                    if col_und  != "(não usar)": preview_cols[col_und]  = "Unidade"
+                    if col_prec != "(não usar)": preview_cols[col_prec] = "Preço"
+
+                    df_prev = df_raw[list(preview_cols.keys())].rename(columns=preview_cols)
+                    df_prev = df_prev.dropna(subset=["Cód. Fab"]).head(10)
+                    st.markdown("**Prévia (10 primeiras linhas):**")
+                    st.dataframe(df_prev, use_container_width=True, hide_index=True)
+
+                    st.markdown("")
+                    if st.button("💾 Salvar tabela de preços", type="primary", use_container_width=True, key="tp_salvar"):
+                        if col_prec == "(não usar)":
+                            st.error("Selecione a coluna de Preço.")
+                        else:
+                            items = []
+                            for _, row in df_raw.iterrows():
+                                cod = str(row.get(col_cod, "") or "").strip()
+                                if not cod or cod.lower() in ("nan", "none", ""):
+                                    continue
+                                preco_raw = str(row.get(col_prec, "0") or "0").strip()
+                                preco_raw = preco_raw.replace("R$","").replace(" ","").replace(".","").replace(",",".").strip()
+                                try:
+                                    preco_val = float(preco_raw)
+                                except ValueError:
+                                    preco_val = 0.0
+                                items.append({
+                                    "codigo_fab": cod,
+                                    "descricao":  str(row.get(col_desc, "") or "") if col_desc != "(não usar)" else "",
+                                    "unidade":    str(row.get(col_und,  "") or "") if col_und  != "(não usar)" else "",
+                                    "preco":      preco_val,
+                                })
+                            if items:
+                                banco.salvar_tabela_precos(rede_obj["id"], fab_obj["id"], items)
+                                st.success(f"✅ {len(items)} itens salvos para {rede_sel} × {fab_sel}!")
+                                st.rerun()
+                            else:
+                                st.error("Nenhum item válido encontrado. Verifique o mapeamento.")
+                else:
+                    st.warning("Selecione a coluna com o Código da Fábrica.")
+
+            except Exception as e:
+                st.error(f"Erro ao ler arquivo: {e}")
+
+        if tab_atual:
+            st.markdown("---")
+            with st.expander("🗑️ Remover tabela de preços"):
+                st.warning(f"Isso removerá todos os {len(tab_atual)} itens de {rede_sel} × {fab_sel}.")
+                if st.button("🗑️ Confirmar remoção", key="tp_limpar"):
+                    banco.limpar_tabela_precos(rede_obj["id"], fab_obj["id"])
+                    st.success("Tabela removida.")
+                    st.rerun()
 
 
 # ══════════════════════════════════════════════════════════════════════════════
