@@ -252,12 +252,33 @@ def salvar_produto(fabrica_id, codigo_fab, nome, familia="", peso="", qtde_cx=""
     """, (fabrica_id, str(codigo_fab), nome, familia, peso, str(qtde_cx), und, preco))
 
 
-def importar_catalogo_df(fabrica_id, df):
+def importar_catalogo_df(fabrica_id, df, col_map=None):
+    """
+    col_map: dict com chaves (codigo_fab, nome, familia, peso, qtde_cx, und, preco)
+             mapeando para nomes de colunas do df. Valores None = ignorar campo.
+    Se col_map não fornecido, tenta detectar por nome de coluna (legado).
+    """
+    def _get(row, campo, fallbacks):
+        if col_map and col_map.get(campo):
+            val = row.get(col_map[campo], "")
+        else:
+            val = ""
+            for fb in fallbacks:
+                val = row.get(fb, "")
+                if val and str(val) not in ("nan", "None", ""):
+                    break
+        v = str(val).strip()
+        return "" if v in ("nan", "None") else v
+
     conn = conectar()
     n = 0
     try:
         with conn.cursor() as cur:
             for _, row in df.iterrows():
+                cod  = _get(row, "codigo_fab", ["Codigo", "COD", "Cód", "código"])
+                nome = _get(row, "nome",       ["Produto", "PRODUTO", "Nome", "NOME", "Descrição"])
+                if not cod or not nome:
+                    continue
                 try:
                     cur.execute("""
                         INSERT INTO produtos (fabrica_id, codigo_fab, nome, familia, peso, qtde_cx, und, preco)
@@ -267,13 +288,13 @@ def importar_catalogo_df(fabrica_id, df):
                             qtde_cx=EXCLUDED.qtde_cx, und=EXCLUDED.und, preco=EXCLUDED.preco
                     """, (
                         fabrica_id,
-                        str(row.get("codigo_fab", row.get("Codigo", row.get("COD", "")))).strip(),
-                        str(row.get("nome", row.get("Produto", row.get("PRODUTO", "")))).strip(),
-                        str(row.get("familia", row.get("Familia", row.get("FAMILIA", "")))).strip(),
-                        str(row.get("peso", row.get("Peso", ""))).strip(),
-                        str(row.get("qtde_cx", row.get("Qtd", row.get("QTD", "")))).strip(),
-                        str(row.get("und", row.get("UND", row.get("Unidade", "")))).strip(),
-                        str(row.get("preco", row.get("Preco", row.get("PRECO", "")))).strip(),
+                        cod,
+                        nome,
+                        _get(row, "familia",  ["Familia", "FAMILIA", "Categoria", "Linha"]),
+                        _get(row, "peso",     ["Peso", "PESO", "Gramatura"]),
+                        _get(row, "qtde_cx",  ["Qtd", "QTD", "QtdCX", "CX"]),
+                        _get(row, "und",      ["UND", "Unidade", "Embalagem"]),
+                        _get(row, "preco",    ["Preco", "PRECO", "Preço", "Valor"]),
                     ))
                     n += 1
                 except Exception:
