@@ -51,6 +51,8 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     st.markdown("---")
+    if st.button("🔄 Atualizar dados", use_container_width=True):
+        st.rerun()
     st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.3)">Banco: Supabase PostgreSQL</div>',
                 unsafe_allow_html=True)
 
@@ -181,7 +183,12 @@ if pagina == "🗂️ Gerar Relatório":
 # PÁGINA: FÁBRICAS
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "🏭 Fábricas":
-    st.title("Fábricas")
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Fábricas")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_fab"):
+            st.rerun()
     st.caption("Fornecedores representados pela Compartilhar NE.")
 
     fabricas = banco.listar_fabricas()
@@ -230,7 +237,12 @@ elif pagina == "🏭 Fábricas":
 # PÁGINA: REDES / CLIENTES
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "🏪 Redes / Clientes":
-    st.title("Redes / Clientes")
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Redes / Clientes")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_redes"):
+            st.rerun()
     st.caption("Clientes onde os produtos são vendidos. O 'Filtro nome' é o texto que aparece no faturamento.")
 
     redes = banco.listar_redes()
@@ -283,7 +295,12 @@ elif pagina == "🏪 Redes / Clientes":
 # PÁGINA: PRODUTOS
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "📦 Produtos":
-    st.title("Produtos")
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Produtos")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_prod"):
+            st.rerun()
     st.caption("Catálogo de produtos por fábrica.")
 
     fabricas = banco.listar_fabricas()
@@ -321,12 +338,11 @@ elif pagina == "📦 Produtos":
             fc1, fc2 = st.columns(2)
             cod_in  = fc1.text_input("Código *", value=p_edit["codigo_fab"] if p_edit else "")
             nome_in = fc2.text_input("Nome *",   value=p_edit["nome"] if p_edit else "")
-            fc3, fc4, fc5, fc6, fc7 = st.columns(5)
+            fc3, fc4, fc5, fc6 = st.columns(4)
             fam_in   = fc3.text_input("Família",  value=p_edit["familia"]  or "" if p_edit else "")
             peso_in  = fc4.text_input("Peso CX",  value=p_edit["peso"]     or "" if p_edit else "")
             qtd_in   = fc5.text_input("Qtde CX",  value=p_edit["qtde_cx"] or "" if p_edit else "")
             und_in   = fc6.text_input("UND",       value=p_edit["und"]      or "" if p_edit else "")
-            preco_in = fc7.text_input("Preço",     value=p_edit["preco"]    or "" if p_edit else "")
 
             sb1, sb2 = st.columns([3, 1])
             salvar = sb1.form_submit_button("💾 Salvar produto", use_container_width=True)
@@ -334,7 +350,7 @@ elif pagina == "📦 Produtos":
 
             if salvar:
                 if cod_in and nome_in:
-                    banco.salvar_produto(fab["id"], cod_in, nome_in, fam_in, peso_in, qtd_in, und_in, preco_in)
+                    banco.salvar_produto(fab["id"], cod_in, nome_in, fam_in, peso_in, qtd_in, und_in, "")
                     st.success("Produto salvo!")
                     st.rerun()
                 else:
@@ -353,9 +369,16 @@ elif pagina == "📦 Produtos":
 
     arq = st.file_uploader("Selecione o arquivo de catálogo", type=["xlsx", "xls"],
                             key="upload_catalogo")
-    if arq and fab:
+    if arq is not None:
+        st.session_state["_cache_catalogo"] = (arq.name, arq.read())
+
+    if "_cache_catalogo" in st.session_state and fab:
+        import io as _io
+        _arq_name, _arq_bytes = st.session_state["_cache_catalogo"]
+        if arq is None:
+            st.info(f"📄 Arquivo em cache: **{_arq_name}** — use 🔄 Atualizar para reprocessar ou envie outro arquivo.")
         try:
-            df_raw = pd.read_excel(arq, header=None)
+            df_raw = pd.read_excel(_io.BytesIO(_arq_bytes), header=None)
 
             # Auto-detectar linha de cabeçalho (procura linha com palavras-chave)
             header_row = 0
@@ -431,7 +454,12 @@ elif pagina == "📦 Produtos":
 # PÁGINA: CÓDIGOS DA REDE
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "🔢 Códigos da Rede":
-    st.title("Códigos da Rede")
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Códigos da Rede")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_cod"):
+            st.rerun()
     st.caption("Mapeamento entre o código da fábrica e o código que cada rede usa internamente.")
 
     fabricas = banco.listar_fabricas()
@@ -467,9 +495,16 @@ elif pagina == "🔢 Códigos da Rede":
         st.caption("Envie qualquer planilha — o sistema detecta as colunas automaticamente e você confirma o mapeamento.")
         arq_cod = st.file_uploader("Selecione a planilha de mapeamento",
                                    type=["xlsx", "xls"], key="upload_codigos")
-        if arq_cod:
+        if arq_cod is not None:
+            st.session_state["_cache_codigos"] = (arq_cod.name, arq_cod.read())
+
+        if "_cache_codigos" in st.session_state:
+            import io as _io
+            _cod_name, _cod_bytes = st.session_state["_cache_codigos"]
+            if arq_cod is None:
+                st.info(f"📄 Arquivo em cache: **{_cod_name}** — use 🔄 Atualizar para reprocessar.")
             try:
-                df_raw_cod = pd.read_excel(arq_cod, header=None)
+                df_raw_cod = pd.read_excel(_io.BytesIO(_cod_bytes), header=None)
                 # Detectar cabeçalho
                 header_row = 0
                 for i, row in df_raw_cod.iterrows():
@@ -575,7 +610,12 @@ elif pagina == "🔢 Códigos da Rede":
 # PÁGINA: IMPORTAR FATURAMENTO
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "📥 Importar Faturamento":
-    st.title("Importar Faturamento")
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Importar Faturamento")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_fat"):
+            st.rerun()
     st.caption("Selecione um ou mais arquivos. O período é detectado pelo nome do arquivo automaticamente.")
 
     MESES = {
@@ -624,15 +664,27 @@ elif pagina == "📥 Importar Faturamento":
         accept_multiple_files=True,
     )
 
+    # Cache novos uploads; usa cache se nenhum novo foi enviado
     if arqs_fat:
+        st.session_state["_cache_fat"] = [(f.name, f.size, f.read()) for f in arqs_fat]
+
+    fat_lista = st.session_state.get("_cache_fat", [])
+
+    if fat_lista and not arqs_fat:
+        st.info(f"📦 {len(fat_lista)} arquivo(s) em cache. Clique 🔄 Atualizar para reprocessar ou envie novos arquivos.")
+        if st.button("🗑️ Limpar arquivos em cache", key="rm_fat"):
+            del st.session_state["_cache_fat"]
+            st.rerun()
+
+    if fat_lista:
         st.markdown("**Arquivos detectados:**")
         ano_atual = datetime.date.today().year
         mes_atual = datetime.date.today().month
 
         configs = []
-        for i, arq in enumerate(arqs_fat):
-            tag_auto, label_auto = _detectar_periodo(arq.name)
-            with st.expander(f"📄 {arq.name} ({arq.size/1024:.0f} KB)", expanded=True):
+        for i, (arq_nome, arq_size, arq_bytes) in enumerate(fat_lista):
+            tag_auto, label_auto = _detectar_periodo(arq_nome)
+            with st.expander(f"📄 {arq_nome} ({arq_size/1024:.0f} KB)", expanded=True):
                 if tag_auto:
                     st.success(f"Período detectado: **{label_auto}**")
                     usar_auto = st.checkbox("Usar período detectado", value=True, key=f"auto_{i}")
@@ -659,12 +711,11 @@ elif pagina == "📥 Importar Faturamento":
                 if ja_importado:
                     st.warning(f"⚠️ {label_final} já importado ({ja_importado['n_linhas']} lançamentos). Re-importar substitui.")
 
-                configs.append((arq, tag_final, label_final))
+                configs.append((arq_bytes, tag_final, label_final))
 
         if st.button("📥 Importar todos os arquivos", type="primary", use_container_width=True):
-            for arq, tag, label in configs:
+            for conteudo, tag, label in configs:
                 with st.spinner(f"Processando {label}..."):
-                    conteudo = arq.read()
                     try:
                         stats = imp.importar_faturamento(conteudo, tag)
                         if stats["gravados"] > 0:
