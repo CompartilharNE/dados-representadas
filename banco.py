@@ -477,8 +477,8 @@ def vendas_por_produto(fabrica_id, rede_id, data_inicio, data_fim):
         JOIN lojas l ON l.id = f.loja_id
         WHERE l.rede_id=%s
           AND f.produto_id IN (SELECT p.id FROM produtos p WHERE p.fabrica_id=%s)
-          AND (%s = '' OR f.data_pedido >= %s)
-          AND (%s = '' OR f.data_pedido <= %s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
         GROUP BY f.produto_id
     """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
     return {r["produto_id"]: dict(r) for r in rows}
@@ -493,8 +493,8 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
         JOIN lojas l ON l.id = f.loja_id
         WHERE l.rede_id=%s
           AND f.produto_id IN (SELECT p.id FROM produtos p WHERE p.fabrica_id=%s)
-          AND (%s = '' OR f.data_pedido >= %s)
-          AND (%s = '' OR f.data_pedido <= %s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
+          AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
         GROUP BY f.loja_id, l.nome_faturamento, l.estado
         ORDER BY valor_total DESC
     """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))

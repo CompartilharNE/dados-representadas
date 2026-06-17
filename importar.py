@@ -133,8 +133,16 @@ def _detectar_rede(nome_cliente, redes):
 def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
     """
     Lê o faturamento, identifica fábrica/rede/produto e grava no banco.
+    nome_arquivo no formato YYYY-MM (ex: 2026-06) define a data do período.
     Retorna dict com estatísticas.
     """
+    # Data do período baseada no nome do arquivo (YYYY-MM → YYYY-MM-01)
+    try:
+        partes = nome_arquivo.split("-")
+        data_periodo = f"{partes[0]}-{partes[1]}-01"
+    except Exception:
+        data_periodo = ""
+
     fabricas = banco.listar_fabricas()
     redes    = banco.listar_redes()
 
@@ -182,7 +190,7 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
             nome_cliente = cells[1].strip()
             forn_raw     = cells[3].strip()
             cod_raw      = cells[6].strip()
-            data_raw     = ""  # faturamento não tem data explícita por linha
+            data_raw     = data_periodo  # data do período selecionado na importação
             qtd_raw      = cells[9].strip()
             valor_raw    = cells[11].strip()
 
