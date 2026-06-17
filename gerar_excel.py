@@ -335,7 +335,7 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     c.font = Font(name="Calibri", bold=True, size=14, color="FFFFFF")
     c.alignment = Alignment(horizontal="center", vertical="center")
     c.fill = _fill(COR_TITULO)
-    ws.row_dimensions[1].height = 60
+    ws.row_dimensions[1].height = 36
 
     for i, (lb, vl) in enumerate([
         ("REDE:", rede_nome),
@@ -352,18 +352,18 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         ws.cell(i, 2).font = _fnt(bold=True, color=COR_TITULO)
         ws.cell(i, 2).fill = _fill(COR_CINZA)
         ws.cell(i, 2).border = _borda
-        ws.row_dimensions[i].height = 18
+        ws.row_dimensions[i].height = 20
 
-    ws.row_dimensions[6].height = 6
+    ws.row_dimensions[6].height = 4
 
     # Logo Compartilhar — canto superior direito (âncora E1)
     try:
         from openpyxl.drawing.image import Image as XLImage
         _logo_bytes = base64.b64decode(_LOGO_B64)
         img = XLImage(io.BytesIO(_logo_bytes))
-        img.height = 55
+        img.height = 72
         img.width  = 160
-        img.anchor = "E1"
+        img.anchor = "F2"
         ws.add_image(img)
     except Exception:
         pass
@@ -388,8 +388,9 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         fam = p.get("familia", "")
         if usar_familia and fam != fam_atual:
             fam_atual = fam
-            _merge(ws, linha, 1, ncols, f"  {fam}", COR_AZUL_2, "FFFFFF", True, 9, "left", 16)
-            linha += 1
+            if fam:
+                _merge(ws, linha, 1, ncols, f"  {fam}", COR_AZUL_2, "FFFFFF", True, 9, "left", 16)
+                linha += 1
 
         bg = COR_BRANCO if i % 2 == 0 else COR_VERDE_F
         vals = [
@@ -422,8 +423,9 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         fam = p.get("familia", "")
         if usar_familia and fam != fam_atual:
             fam_atual = fam
-            _merge(ws, linha, 1, ncols, f"  {fam}", "FFE5CC", COR_LARANJA_E, True, 9, "left", 16)
-            linha += 1
+            if fam:
+                _merge(ws, linha, 1, ncols, f"  {fam}", "FFE5CC", COR_LARANJA_E, True, 9, "left", 16)
+                linha += 1
 
         bg = COR_BRANCO if i % 2 == 0 else COR_VERM_F
         vals = [
@@ -444,6 +446,15 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     for col, w in zip("ABCDEFG", [11, 16, 44, 14, 12, 10, 18]):
         ws.column_dimensions[col].width = w
     ws.freeze_panes = "A8"
+
+    # Configuração de impressão — retrato, todas as colunas em 1 página
+    ws.page_setup.orientation = ws.ORIENTATION_PORTRAIT
+    ws.page_setup.fitToPage = True
+    ws.page_setup.fitToWidth = 1
+    ws.page_setup.fitToHeight = 0
+    ws.sheet_properties.pageSetUpPr.fitToPage = True
+    from openpyxl.worksheet.page import PageMargins
+    ws.page_margins = PageMargins(left=0.4, right=0.4, top=0.5, bottom=0.5, header=0.3, footer=0.3)
 
     n_comp = len(prods_comprados)
     n_nc   = len(prods_nao_comprados)
