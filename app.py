@@ -310,31 +310,67 @@ elif pagina == "📦 Produtos":
 
     st.markdown("---")
     st.markdown("**Importar catálogo (.xlsx)**")
-    st.caption("O arquivo deve ter colunas: Código (ou Cód), Produto (ou Nome), Família, Peso, Qtde CX, UND, Preço")
+    st.caption("Envie qualquer planilha — o sistema detecta as colunas automaticamente e você confirma o mapeamento.")
 
     arq = st.file_uploader("Selecione o arquivo de catálogo", type=["xlsx", "xls"],
                             key="upload_catalogo")
     if arq and fab:
         try:
-            df_cat = pd.read_excel(arq, header=None)
-            # Auto-detectar linha de cabeçalho
+            df_raw = pd.read_excel(arq, header=None)
+
+            # Auto-detectar linha de cabeçalho (procura linha com palavras-chave)
             header_row = 0
-            for i, row in df_cat.iterrows():
+            for i, row in df_raw.iterrows():
                 vals = [str(v).lower() for v in row.values]
-                if any(kw in " ".join(vals) for kw in ["código", "cod", "produto", "nome"]):
+                joined = " ".join(vals)
+                if any(kw in joined for kw in ["código", "cod", "produto", "nome", "descrição"]):
                     header_row = i
                     break
-            df_cat.columns = df_cat.iloc[header_row]
+            df_cat = df_raw.copy()
+            df_cat.columns = [str(c).strip() for c in df_raw.iloc[header_row]]
             df_cat = df_cat.iloc[header_row + 1:].reset_index(drop=True)
             df_cat = df_cat.dropna(how="all")
 
-            st.write(f"**Pré-visualização** ({len(df_cat)} linhas):")
-            st.dataframe(df_cat.head(10), use_container_width=True)
+            colunas = ["(ignorar)"] + list(df_cat.columns)
 
-            if st.button("✅ Confirmar importação do catálogo", use_container_width=True):
-                n = banco.importar_catalogo_df(fab["id"], df_cat)
-                st.success(f"{n} produtos importados/atualizados para {fab_sel}.")
-                st.rerun()
+            # Função para sugerir coluna por palavras-chave
+            def _sugerir(keywords):
+                for col in df_cat.columns:
+                    c = str(col).lower()
+                    if any(kw in c for kw in keywords):
+                        return col
+                return "(ignorar)"
+
+            st.write(f"**Pré-visualização** ({len(df_cat)} linhas detectadas):")
+            st.dataframe(df_cat.head(5), use_container_width=True)
+
+            st.markdown("**Mapeamento de colunas** — confirme ou ajuste:")
+            c1, c2, c3, c4 = st.columns(4)
+            col_cod    = c1.selectbox("Código *",    colunas, index=colunas.index(_sugerir(["cód","cod","codigo","ref"])))
+            col_nome   = c2.selectbox("Produto *",   colunas, index=colunas.index(_sugerir(["produto","nome","descrição","descricao"])))
+            col_fam    = c3.selectbox("Família",     colunas, index=colunas.index(_sugerir(["famil","categoria","grupo","linha"])))
+            col_peso   = c4.selectbox("Peso",        colunas, index=colunas.index(_sugerir(["peso","gramatura","kg","g"])))
+            c5, c6, c7 = st.columns(3)
+            col_qtd    = c5.selectbox("Qtde CX",     colunas, index=colunas.index(_sugerir(["qtd","quant","cx","caixa","pcs"])))
+            col_und    = c6.selectbox("UND",         colunas, index=colunas.index(_sugerir(["und","unidade","emb","embalagem"])))
+            col_preco  = c7.selectbox("Preço",       colunas, index=colunas.index(_sugerir(["preço","preco","valor","price"])))
+
+            if col_cod == "(ignorar)" or col_nome == "(ignorar)":
+                st.warning("Código e Produto são obrigatórios.")
+            else:
+                col_map = {
+                    "codigo_fab": col_cod,
+                    "nome":       col_nome,
+                    "familia":    col_fam    if col_fam    != "(ignorar)" else None,
+                    "peso":       col_peso   if col_peso   != "(ignorar)" else None,
+                    "qtde_cx":    col_qtd    if col_qtd    != "(ignorar)" else None,
+                    "und":        col_und    if col_und    != "(ignorar)" else None,
+                    "preco":      col_preco  if col_preco  != "(ignorar)" else None,
+                }
+                if st.button("✅ Confirmar importação do catálogo", use_container_width=True):
+                    n = banco.importar_catalogo_df(fab["id"], df_cat, col_map=col_map)
+                    st.success(f"{n} produtos importados/atualizados para {fab_sel}.")
+                    st.rerun()
         except Exception as e:
             st.error(f"Erro ao ler arquivo: {e}")
 
@@ -376,43 +412,71 @@ elif pagina == "🔢 Códigos da Rede":
 
         st.markdown("---")
         st.markdown("**Importar mapeamento (.xlsx)**")
-        st.caption("O arquivo deve ter colunas: Cód Fab (ou código da fábrica) e Cód Rede (ou código do cliente).")
+        st.caption("Envie qualquer planilha — o sistema detecta as colunas automaticamente e você confirma o mapeamento.")
         arq_cod = st.file_uploader("Selecione a planilha de mapeamento",
                                    type=["xlsx", "xls"], key="upload_codigos")
         if arq_cod:
             try:
-                df_cod = pd.read_excel(arq_cod, header=None)
+                df_raw_cod = pd.read_excel(arq_cod, header=None)
                 # Detectar cabeçalho
                 header_row = 0
-                for i, row in df_cod.iterrows():
+                for i, row in df_raw_cod.iterrows():
                     vals = [str(v).lower() for v in row.values]
-                    if any("cód" in v or "cod" in v for v in vals):
+                    joined = " ".join(vals)
+                    if any(kw in joined for kw in ["cód", "cod", "código", "produto", "nome"]):
                         header_row = i
                         break
-                df_cod.columns = [str(c).strip() for c in df_cod.iloc[header_row]]
+                df_cod = df_raw_cod.copy()
+                df_cod.columns = [str(c).strip() for c in df_raw_cod.iloc[header_row]]
                 df_cod = df_cod.iloc[header_row + 1:].reset_index(drop=True)
                 df_cod = df_cod.dropna(how="all")
 
-                # Renomear colunas para padrão
-                col_map = {}
-                for col in df_cod.columns:
-                    cl = str(col).lower()
-                    if "fab" in cl or "quatá" in cl or "fornecedor" in cl:
-                        col_map[col] = "codigo_fab"
-                    elif "atacadão" in cl or "rede" in cl or "cliente" in cl or "cod" in cl:
-                        if "codigo_fab" not in col_map.values():
-                            col_map[col] = "codigo_fab"
-                        else:
-                            col_map[col] = "codigo_rede"
-                df_cod = df_cod.rename(columns=col_map)
+                colunas_cod = ["(ignorar)"] + list(df_cod.columns)
 
-                st.write(f"**Pré-visualização** ({len(df_cod)} linhas):")
-                st.dataframe(df_cod.head(10), use_container_width=True)
+                def _sug_cod(keywords):
+                    for col in df_cod.columns:
+                        c = str(col).lower()
+                        if any(kw in c for kw in keywords):
+                            return col
+                    return "(ignorar)"
 
-                if st.button("✅ Confirmar importação dos códigos", use_container_width=True):
-                    n = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_cod)
-                    st.success(f"{n} códigos importados/atualizados.")
-                    st.rerun()
+                st.write(f"**Pré-visualização** ({len(df_cod)} linhas detectadas):")
+                st.dataframe(df_cod.head(5), use_container_width=True)
+
+                st.markdown("**Mapeamento de colunas** — confirme ou ajuste:")
+                cc1, cc2 = st.columns(2)
+                col_cf = cc1.selectbox(
+                    f"Código da Fábrica *",
+                    colunas_cod,
+                    index=colunas_cod.index(_sug_cod(["fab", "fornec", "quata", "allfood", "prieto", "bufa", "sao vic", "villa", "cod fab", "codigo fab"])),
+                    key="map_cod_fab"
+                )
+                col_cr = cc2.selectbox(
+                    f"Código da Rede ({rede_sel}) *",
+                    colunas_cod,
+                    index=colunas_cod.index(_sug_cod(["rede", "cliente", "assai", "atacad", "gbarbosa", "carrefour", "extra", "bomprec", "soberano", "cod rede"])),
+                    key="map_cod_rede"
+                )
+
+                if col_cf == "(ignorar)" or col_cr == "(ignorar)":
+                    st.warning("Selecione as duas colunas obrigatórias.")
+                else:
+                    # Montar df padronizado para importação
+                    df_para_import = pd.DataFrame({
+                        "codigo_fab":  df_cod[col_cf].astype(str).str.strip(),
+                        "codigo_rede": df_cod[col_cr].astype(str).str.strip(),
+                    })
+                    df_para_import = df_para_import[
+                        (df_para_import["codigo_fab"] != "") &
+                        (df_para_import["codigo_rede"] != "") &
+                        (~df_para_import["codigo_fab"].isin(["nan", "None"])) &
+                        (~df_para_import["codigo_rede"].isin(["nan", "None"]))
+                    ]
+                    st.caption(f"{len(df_para_import)} pares válidos encontrados.")
+                    if st.button("✅ Confirmar importação dos códigos", use_container_width=True):
+                        n = banco.importar_codigos_rede_df(fab["id"], rede["id"], df_para_import)
+                        st.success(f"{n} códigos importados/atualizados.")
+                        st.rerun()
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
 
