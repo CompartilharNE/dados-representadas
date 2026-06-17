@@ -379,7 +379,10 @@ def obter_ou_criar_loja(rede_id, nome_faturamento, estado=""):
     conn = conectar()
     try:
         with conn.cursor() as cur:
-            cur.execute("SELECT id FROM lojas WHERE nome_faturamento=%s", (nome_faturamento,))
+            cur.execute(
+                "SELECT id FROM lojas WHERE nome_faturamento=%s AND rede_id=%s",
+                (nome_faturamento, rede_id)
+            )
             loja = cur.fetchone()
             if loja:
                 return loja[0]
