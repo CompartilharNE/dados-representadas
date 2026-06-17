@@ -327,9 +327,22 @@ elif pagina == "📦 Produtos":
                     header_row = i
                     break
             df_cat = df_raw.copy()
-            df_cat.columns = [str(c).strip() for c in df_raw.iloc[header_row]]
+            # Deduplica nomes de colunas (colunas vazias/repetidas viram _1, _2...)
+            raw_cols = [str(c).strip() for c in df_raw.iloc[header_row]]
+            seen = {}
+            dedup_cols = []
+            for c in raw_cols:
+                if c in seen:
+                    seen[c] += 1
+                    dedup_cols.append(f"{c}_{seen[c]}" if c != "nan" else f"_col{seen[c]}")
+                else:
+                    seen[c] = 0
+                    dedup_cols.append(c if c != "nan" else f"_col{len(dedup_cols)}")
+            df_cat.columns = dedup_cols
             df_cat = df_cat.iloc[header_row + 1:].reset_index(drop=True)
             df_cat = df_cat.dropna(how="all")
+            # Remove colunas sem nome útil
+            df_cat = df_cat[[c for c in df_cat.columns if not c.startswith("_col")]]
 
             colunas = ["(ignorar)"] + list(df_cat.columns)
 
