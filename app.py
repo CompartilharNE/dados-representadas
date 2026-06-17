@@ -537,77 +537,106 @@ elif pagina == "🔢 Códigos da Rede":
 # ══════════════════════════════════════════════════════════════════════════════
 elif pagina == "📥 Importar Faturamento":
     st.title("Importar Faturamento")
-    st.caption("Importe o faturamento mês a mês. Re-importar um mês substitui os dados anteriores daquele mês.")
+    st.caption("Selecione um ou mais arquivos. O período é detectado pelo nome do arquivo automaticamente.")
 
     MESES = {
         1: "Janeiro", 2: "Fevereiro", 3: "Marco", 4: "Abril",
         5: "Maio", 6: "Junho", 7: "Julho", 8: "Agosto",
         9: "Setembro", 10: "Outubro", 11: "Novembro", 12: "Dezembro"
     }
+    MESES_PT = {
+        "jan": 1, "fev": 2, "mar": 3, "abr": 4, "mai": 5, "jun": 6,
+        "jul": 7, "ago": 8, "set": 9, "out": 10, "nov": 11, "dez": 12,
+        "janeiro": 1, "fevereiro": 2, "marco": 3, "março": 3, "abril": 4,
+        "maio": 5, "junho": 6, "julho": 7, "agosto": 8,
+        "setembro": 9, "outubro": 10, "novembro": 11, "dezembro": 12,
+    }
 
-    ano_atual = datetime.date.today().year
-    mes_atual = datetime.date.today().month
+    def _detectar_periodo(nome_arquivo):
+        """Tenta extrair YYYY-MM do nome do arquivo."""
+        import re
+        n = nome_arquivo.lower().replace("_", "-").replace(" ", "-")
+        # Padrão YYYY-MM ou MM-YYYY
+        m = re.search(r'(20\d{2})[^\d]?(\d{2})', n)
+        if m:
+            ano, mes = int(m.group(1)), int(m.group(2))
+            if 1 <= mes <= 12:
+                return f"{ano}-{mes:02d}", f"{MESES.get(mes, mes)}/{ano}"
+        m = re.search(r'(\d{2})[^\d]?(20\d{2})', n)
+        if m:
+            mes, ano = int(m.group(1)), int(m.group(2))
+            if 1 <= mes <= 12:
+                return f"{ano}-{mes:02d}", f"{MESES.get(mes, mes)}/{ano}"
+        # Nome do mês por extenso
+        ano_atual = datetime.date.today().year
+        for nome_mes, num_mes in MESES_PT.items():
+            if nome_mes in n:
+                m_ano = re.search(r'20\d{2}', n)
+                ano = int(m_ano.group()) if m_ano else ano_atual
+                return f"{ano}-{num_mes:02d}", f"{MESES.get(num_mes, num_mes)}/{ano}"
+        return None, None
 
-    col_m, col_a = st.columns(2)
-    with col_m:
-        mes_sel = st.selectbox(
-            "Mês de referência",
-            options=list(MESES.keys()),
-            format_func=lambda x: MESES[x],
-            index=mes_atual - 1,
-            key="mes_fat"
-        )
-    with col_a:
-        ano_sel = st.selectbox(
-            "Ano",
-            options=[ano_atual - 1, ano_atual],
-            index=1,
-            key="ano_fat"
-        )
-
-    periodo_tag = f"{ano_sel}-{mes_sel:02d}"
-    periodo_label = f"{MESES[mes_sel]}/{ano_sel}"
-
-    # Verificar se já existe importação para esse mês
     historico = banco.listar_importacoes()
-    importado = next((h for h in historico if h["arquivo"] == periodo_tag), None)
 
-    if importado:
-        st.warning(f"⚠️ {periodo_label} já foi importado ({importado['n_linhas']} lançamentos em {importado['data_importacao'][:16]}). Re-importar vai substituir esses dados.")
-
-    st.markdown("---")
-    arq_fat = st.file_uploader(
-        f"Selecione o arquivo de faturamento de {periodo_label} (.xls ou .xlsx)",
+    arqs_fat = st.file_uploader(
+        "Selecione os arquivos de faturamento (.xls ou .xlsx) — pode selecionar vários",
         type=["xls", "xlsx"],
         key="upload_fat",
+        accept_multiple_files=True,
     )
 
-    if arq_fat:
-        st.info(f"Arquivo: **{arq_fat.name}** — {arq_fat.size / 1024:.0f} KB")
-        if st.button(f"📥 Importar {periodo_label}", type="primary", use_container_width=True):
-            with st.spinner(f"Processando faturamento de {periodo_label}..."):
-                conteudo = arq_fat.read()
-                try:
-                    stats = imp.importar_faturamento(conteudo, periodo_tag)
-                    col1, col2, col3, col4 = st.columns(4)
-                    with col1:
-                        st.metric("Linhas lidas", stats["total"])
-                    with col2:
-                        st.metric("Gravados", stats["gravados"])
-                    with col3:
-                        st.metric("Sem produto cadastrado", stats["sem_produto"])
-                    with col4:
-                        st.metric("Erros", stats["erros"])
+    if arqs_fat:
+        st.markdown("**Arquivos detectados:**")
+        ano_atual = datetime.date.today().year
+        mes_atual = datetime.date.today().month
 
-                    if stats["gravados"] > 0:
-                        st.success(f"✅ {periodo_label} importado com sucesso! {stats['gravados']} lançamentos gravados.")
-                    else:
-                        st.warning("Nenhum lançamento foi gravado. Verifique se os catálogos estão cadastrados.")
+        configs = []
+        for i, arq in enumerate(arqs_fat):
+            tag_auto, label_auto = _detectar_periodo(arq.name)
+            with st.expander(f"📄 {arq.name} ({arq.size/1024:.0f} KB)", expanded=True):
+                if tag_auto:
+                    st.success(f"Período detectado: **{label_auto}**")
+                    usar_auto = st.checkbox("Usar período detectado", value=True, key=f"auto_{i}")
+                else:
+                    st.warning("Período não detectado no nome do arquivo — selecione manualmente:")
+                    usar_auto = False
 
-                    if stats["sem_produto"] > stats["gravados"]:
-                        st.info("💡 Muitos produtos sem cadastro. Importe os catálogos das fábricas na aba Produtos.")
-                except Exception as e:
-                    st.error(f"Erro ao importar: {e}")
+                if not tag_auto or not usar_auto:
+                    cc1, cc2 = st.columns(2)
+                    with cc1:
+                        mes_m = cc1.selectbox("Mês", list(MESES.keys()),
+                                              format_func=lambda x: MESES[x],
+                                              index=mes_atual - 1, key=f"mes_{i}")
+                    with cc2:
+                        ano_m = cc2.selectbox("Ano", [ano_atual - 1, ano_atual],
+                                              index=1, key=f"ano_{i}")
+                    tag_final   = f"{ano_m}-{mes_m:02d}"
+                    label_final = f"{MESES[mes_m]}/{ano_m}"
+                else:
+                    tag_final   = tag_auto
+                    label_final = label_auto
+
+                ja_importado = next((h for h in historico if h["arquivo"] == tag_final), None)
+                if ja_importado:
+                    st.warning(f"⚠️ {label_final} já importado ({ja_importado['n_linhas']} lançamentos). Re-importar substitui.")
+
+                configs.append((arq, tag_final, label_final))
+
+        if st.button("📥 Importar todos os arquivos", type="primary", use_container_width=True):
+            for arq, tag, label in configs:
+                with st.spinner(f"Processando {label}..."):
+                    conteudo = arq.read()
+                    try:
+                        stats = imp.importar_faturamento(conteudo, tag)
+                        if stats["gravados"] > 0:
+                            st.success(f"✅ **{label}** — {stats['gravados']} lançamentos gravados "
+                                       f"(sem produto: {stats['sem_produto']})")
+                        else:
+                            st.warning(f"⚠️ **{label}** — nenhum lançamento gravado. "
+                                       f"Sem produto: {stats['sem_produto']}. Verifique os catálogos.")
+                    except Exception as e:
+                        st.error(f"❌ **{label}** — Erro: {e}")
+            st.rerun()
 
     st.markdown("---")
     st.markdown("**Histórico de importações por mês**")
