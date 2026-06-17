@@ -5,9 +5,15 @@ Suporta .xls (HTML disfarçado) e .xlsx real
 """
 import io
 import os
+import unicodedata
 import pandas as pd
 from bs4 import BeautifulSoup
 import banco
+
+
+def _sem_acento(texto):
+    """Remove acentos e normaliza para comparação."""
+    return unicodedata.normalize("NFD", str(texto).lower()).encode("ascii", "ignore").decode("ascii")
 
 # ── MAPEAMENTO ESTADO POR KEYWORD DE LOJA ────────────────────────────────────
 MAPA_ESTADO = {
@@ -61,9 +67,9 @@ def _norm_val(v):
 
 
 def _norm_forn(v, fabricas):
-    vl = str(v).lower().strip()
+    vl = _sem_acento(v).strip()
     for fab in fabricas:
-        if fab["nome_faturamento"].lower() in vl:
+        if _sem_acento(fab["nome_faturamento"]) in vl:
             return fab
     return None
 
@@ -111,14 +117,14 @@ def _parse_xlsx(conteudo_bytes):
 # ── DETECTAR REDE ─────────────────────────────────────────────────────────────
 def _detectar_rede(nome_cliente, redes):
     """Retorna a rede correspondente ao nome do cliente, considerando estados."""
-    nc = nome_cliente.lower()
+    nc = _sem_acento(nome_cliente)
     estado = _estado_por_nome(nome_cliente)
     for rede in redes:
-        filtro = rede["filtro_nome"].lower()
+        filtro = _sem_acento(rede["filtro_nome"])
         if filtro not in nc:
             continue
         # Verificar exclusões
-        excluir = [e.strip() for e in (rede["excluir_palavras"] or "").split(",") if e.strip()]
+        excluir = [_sem_acento(e.strip()) for e in (rede["excluir_palavras"] or "").split(",") if e.strip()]
         if any(ex in nc for ex in excluir):
             continue
         # Verificar estados
