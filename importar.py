@@ -38,6 +38,11 @@ MAPA_ESTADO = {
     "simões filho": "BA", "simoes filho": "BA", "teixeira de freitas": "BA",
     "valença": "BA", "valenca": "BA", "vitória da conquista": "BA",
     "vitoria da conquista": "BA", "aracaju": "SE",
+    # Bairros/locais de Salvador-BA
+    "barra": "BA", "garibaldi": "BA", "canela": "BA", "iguatemi": "BA",
+    "acm": "BA", "boca do rio": "BA", "imbuí": "BA", "imbui": "BA",
+    "ondina": "BA", "liberdade": "BA", "engenho velho": "BA",
+    "paralela": "BA", "aeroclube": "BA", "pernambués": "BA", "pernambuces": "BA",
 }
 
 

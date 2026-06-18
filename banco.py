@@ -191,6 +191,25 @@ def criar_banco():
     finally:
         conn.close()
 
+    # Corrige estados vazios de lojas já importadas usando o mapa atual
+    try:
+        corrigir_estados_lojas()
+    except Exception:
+        pass
+
+
+def corrigir_estados_lojas():
+    """Re-escaneia lojas com estado vazio e atualiza via mapa de importar.py."""
+    import importar as _imp
+    lojas = _fetch("SELECT id, nome_faturamento FROM lojas WHERE estado = '' OR estado IS NULL")
+    atualizados = 0
+    for l in lojas:
+        est = _imp._estado_por_nome(l["nome_faturamento"])
+        if est:
+            _run("UPDATE lojas SET estado=%s WHERE id=%s", (est, l["id"]))
+            atualizados += 1
+    return atualizados
+
 
 # ── FABRICAS ──────────────────────────────────────────────────────────────────
 
@@ -605,7 +624,7 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
     rows = _fetch("""
         SELECT l.id as loja_id, l.nome_faturamento, l.estado,
                SUM(f.valor_total) as valor_total,
-               COUNT(DISTINCT f.produto_id) as n_produtos
+               COUNT(DISTINCT CASE WHEN f.valor_total > 0 THEN f.produto_id END) as n_produtos
         FROM faturamento f
         JOIN lojas l ON l.id = f.loja_id
         WHERE l.rede_id=%s
@@ -617,6 +636,7 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
         GROUP BY f.loja_id, l.id, l.nome_faturamento, l.estado
+        HAVING SUM(f.valor_total) > 0
         ORDER BY valor_total DESC
     """, (rede_id, rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
     return [dict(r) for r in rows]
