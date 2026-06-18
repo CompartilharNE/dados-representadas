@@ -381,7 +381,7 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         c_lbl = ws.cell(r, 1)
         c_lbl.value = lb
         c_lbl.font = _fnt(bold=True, size=9)
-        c_lbl.fill = _fill(COR_CINZA)
+        c_lbl.fill = _fill(COR_BRANCO)
         c_lbl.border = _borda
         c_lbl.alignment = Alignment(horizontal="left", vertical="center")
 
@@ -390,7 +390,7 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         c_val = ws.cell(r, 2)
         c_val.value = vl
         c_val.font = _fnt(bold=True, color=COR_TITULO, size=9)
-        c_val.fill = _fill(COR_CINZA)
+        c_val.fill = _fill(COR_BRANCO)
         c_val.border = _borda
         c_val.alignment = Alignment(horizontal="left", vertical="center")
 
