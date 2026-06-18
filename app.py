@@ -38,17 +38,19 @@ st.markdown("""
     div[data-testid="stDownloadButton"] button { background-color: #1F4E79; color: white; font-weight: 600; width: 100%; }
     [data-testid="stSidebar"] div[data-testid="stButton"] button {
         background: transparent !important;
-        border: 1px solid rgba(39,42,74,0.2) !important;
-        color: rgba(39,42,74,0.55) !important;
-        font-size: 12px !important;
+        border: none !important;
+        color: #e63946 !important;
+        font-size: 13px !important;
         font-weight: 400 !important;
-        padding: 3px 10px !important;
+        padding: 0 4px !important;
         box-shadow: none !important;
+        text-align: left !important;
+        width: auto !important;
     }
     [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
-        border-color: rgba(39,42,74,0.4) !important;
-        color: rgba(39,42,74,0.85) !important;
-        background: rgba(39,42,74,0.06) !important;
+        color: #c1121f !important;
+        background: transparent !important;
+        text-decoration: underline !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -129,7 +131,7 @@ with st.sidebar:
         f'{st.session_state.perfil}</span></div>',
         unsafe_allow_html=True,
     )
-    if st.button("Sair", use_container_width=True):
+    if st.button("↩ Sair", use_container_width=False):
         st.session_state.logged_in = False
         st.session_state.perfil    = None
         st.session_state.username  = None
