@@ -156,6 +156,16 @@ def criar_banco():
                     UNIQUE(rede_id, fabrica_id, codigo_fab)
                 )
             """)
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    nome TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    perfil TEXT NOT NULL DEFAULT 'usuario',
+                    ultimo_acesso TIMESTAMP
+                )
+            """)
 
             # Só popula dados iniciais se as tabelas estiverem vazias (primeiro uso)
             cur.execute("SELECT COUNT(*) FROM fabricas")
