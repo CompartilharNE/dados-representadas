@@ -36,6 +36,20 @@ st.markdown("""
     .blue  { color: #1565c0; }
     .section-header { font-size: 13px; font-weight: 600; color: #444; margin: 8px 0 4px; }
     div[data-testid="stDownloadButton"] button { background-color: #1F4E79; color: white; font-weight: 600; width: 100%; }
+    [data-testid="stSidebar"] div[data-testid="stButton"] button {
+        background: transparent !important;
+        border: 1px solid rgba(39,42,74,0.2) !important;
+        color: rgba(39,42,74,0.55) !important;
+        font-size: 12px !important;
+        font-weight: 400 !important;
+        padding: 3px 10px !important;
+        box-shadow: none !important;
+    }
+    [data-testid="stSidebar"] div[data-testid="stButton"] button:hover {
+        border-color: rgba(39,42,74,0.4) !important;
+        color: rgba(39,42,74,0.85) !important;
+        background: rgba(39,42,74,0.06) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
