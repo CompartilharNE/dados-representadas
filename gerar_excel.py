@@ -377,28 +377,28 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         r = ROW_INFO_START + i
         ws.row_dimensions[r].height = 18
 
-        # Col A: rótulo
+        # Col A: rótulo — sem borda
         c_lbl = ws.cell(r, 1)
         c_lbl.value = lb
         c_lbl.font = _fnt(bold=True, size=9)
         c_lbl.fill = _fill(COR_BRANCO)
-        c_lbl.border = _borda
+        c_lbl.border = Border()
         c_lbl.alignment = Alignment(horizontal="left", vertical="center")
 
-        # Col B:D merged: valor
+        # Col B:D merged: valor — sem borda
         ws.merge_cells(f"B{r}:D{r}")
         c_val = ws.cell(r, 2)
         c_val.value = vl
         c_val.font = _fnt(bold=True, color=COR_TITULO, size=9)
         c_val.fill = _fill(COR_BRANCO)
-        c_val.border = _borda
+        c_val.border = Border()
         c_val.alignment = Alignment(horizontal="left", vertical="center")
 
-        # Col E:G merged: fundo branco para logos
+        # Col E:G merged: fundo branco para logos — sem borda
         ws.merge_cells(f"E{r}:G{r}")
         c_bg = ws.cell(r, 5)
         c_bg.fill = _fill(COR_BRANCO)
-        c_bg.border = _borda
+        c_bg.border = Border()
 
     # Logo da rede — lado esquerdo da área de logos (âncora E2)
     if rede_logo_b64:
