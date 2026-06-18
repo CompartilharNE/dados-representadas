@@ -742,3 +742,50 @@ def vendas_por_loja_produto(fabrica_id, rede_id, data_inicio, data_fim):
             "valor": float(r["valor"] or 0),
         }
     return result
+
+
+# ── USUÁRIOS ──────────────────────────────────────────────────────────────────
+
+def criar_usuario(username, nome, senha):
+    """Cria usuário com senha criptografada. Retorna (True, '') ou (False, mensagem)."""
+    pw_hash = bcrypt.hashpw(senha.encode(), bcrypt.gensalt()).decode()
+    try:
+        _run(
+            "INSERT INTO usuarios (username, nome, password_hash, perfil) VALUES (%s, %s, %s, 'usuario')",
+            (username.strip().lower(), nome.strip(), pw_hash)
+        )
+        return True, ""
+    except Exception as e:
+        msg = "Usuário já existe." if "unique" in str(e).lower() else str(e)
+        return False, msg
+
+
+def verificar_login(username, senha):
+    """Verifica credenciais. Retorna dict do usuário ou None."""
+    row = _fetch(
+        "SELECT * FROM usuarios WHERE username=%s",
+        (username.strip().lower(),), one=True
+    )
+    if not row:
+        return None
+    if bcrypt.checkpw(senha.encode(), row["password_hash"].encode()):
+        _run(
+            "UPDATE usuarios SET ultimo_acesso=NOW() WHERE username=%s",
+            (username.strip().lower(),)
+        )
+        return dict(row)
+    return None
+
+
+def listar_usuarios():
+    rows = _fetch("SELECT id, username, nome, perfil, ultimo_acesso FROM usuarios ORDER BY nome")
+    return [dict(r) for r in rows]
+
+
+def deletar_usuario(usuario_id):
+    _run("DELETE FROM usuarios WHERE id=%s", (usuario_id,))
+
+
+def alterar_senha(usuario_id, nova_senha):
+    pw_hash = bcrypt.hashpw(nova_senha.encode(), bcrypt.gensalt()).decode()
+    _run("UPDATE usuarios SET password_hash=%s WHERE id=%s", (pw_hash, usuario_id))

@@ -1029,3 +1029,70 @@ elif pagina == "📥 Importar Faturamento":
                 banco.limpar_todo_faturamento()
                 st.success("Faturamento apagado.")
                 st.rerun()
+
+
+# ── PÁGINA: USUÁRIOS (admin only) ─────────────────────────────────────────────
+elif pagina == "👥 Usuários" and _is_admin:
+    st.title("👥 Gestão de Usuários")
+    st.caption("Usuários comuns têm acesso apenas à página **Gerar Relatório**.")
+
+    # --- Cadastrar novo usuário ---
+    with st.expander("➕ Cadastrar novo usuário", expanded=False):
+        with st.form("form_novo_usuario"):
+            nu_nome     = st.text_input("Nome completo")
+            nu_username = st.text_input("Usuário (login)")
+            nu_senha    = st.text_input("Senha", type="password")
+            nu_senha2   = st.text_input("Confirmar senha", type="password")
+            salvar_u    = st.form_submit_button("Cadastrar", use_container_width=True, type="primary")
+            if salvar_u:
+                if not nu_nome or not nu_username or not nu_senha:
+                    st.error("Preencha todos os campos.")
+                elif nu_senha != nu_senha2:
+                    st.error("As senhas não conferem.")
+                else:
+                    ok, msg = banco.criar_usuario(nu_username, nu_nome, nu_senha)
+                    if ok:
+                        st.success(f"Usuário **{nu_username}** cadastrado com sucesso.")
+                        st.rerun()
+                    else:
+                        st.error(f"Erro: {msg}")
+
+    # --- Lista de usuários ---
+    st.markdown("### Usuários cadastrados")
+    usuarios = banco.listar_usuarios()
+    if not usuarios:
+        st.info("Nenhum usuário cadastrado ainda.")
+    else:
+        for u in usuarios:
+            col_n, col_u, col_ac, col_del, col_pwd = st.columns([2, 1.5, 1.8, 1, 1])
+            col_n.markdown(f"**{u['nome']}**")
+            col_u.markdown(f"`{u['username']}`")
+            ultimo = u.get("ultimo_acesso")
+            col_ac.caption(f"Último acesso: {str(ultimo)[:16] if ultimo else 'nunca'}")
+            if col_del.button("🗑️", key=f"del_{u['id']}", help="Excluir usuário"):
+                banco.deletar_usuario(u["id"])
+                st.success(f"Usuário **{u['username']}** excluído.")
+                st.rerun()
+            if col_pwd.button("🔑", key=f"pwd_{u['id']}", help="Alterar senha"):
+                st.session_state[f"_trocar_senha_{u['id']}"] = True
+
+            # Formulário inline de troca de senha
+            if st.session_state.get(f"_trocar_senha_{u['id']}"):
+                with st.form(f"form_pwd_{u['id']}"):
+                    np1 = st.text_input("Nova senha", type="password", key=f"np1_{u['id']}")
+                    np2 = st.text_input("Confirmar", type="password", key=f"np2_{u['id']}")
+                    salvar_p = st.form_submit_button("Salvar", use_container_width=True)
+                    if salvar_p:
+                        if np1 != np2:
+                            st.error("As senhas não conferem.")
+                        elif not np1:
+                            st.error("Senha não pode ser vazia.")
+                        else:
+                            banco.alterar_senha(u["id"], np1)
+                            del st.session_state[f"_trocar_senha_{u['id']}"]
+                            st.success("Senha alterada.")
+                            st.rerun()
+
+    st.markdown("---")
+    st.caption("🔐 A senha do administrador é configurada nas secrets do Streamlit Cloud "
+               "(chave `[auth]` → `admin_username` / `admin_password`).")
