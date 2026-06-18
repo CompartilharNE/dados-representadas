@@ -52,9 +52,6 @@ with st.sidebar:
          "📥 Importar Faturamento"],
         label_visibility="collapsed",
     )
-    st.markdown("---")
-    if st.button("🔄 Atualizar dados", use_container_width=True):
-        st.rerun()
     st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.3)">Banco: Supabase PostgreSQL</div>',
                 unsafe_allow_html=True)
 
