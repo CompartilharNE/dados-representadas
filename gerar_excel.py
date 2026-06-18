@@ -274,6 +274,9 @@ COR_VERDE_F   = "E2EFDA"
 COR_VERM_F    = "FFF0F0"
 COR_AZUL_2    = "2E75B6"
 COR_LARANJA_E = "7F3F00"
+COR_HDR_CINZA = "D9D9D9"   # linha 1 — cabeçalho geral
+COR_COL_HDR   = "C5D9F1"   # linha de cabeçalho de colunas
+COR_NC_HDR    = "FCD5B4"   # linha separadora "sem venda"
 
 _borda = Border(
     left=Side(style="thin", color="BFBFBF"),
@@ -329,23 +332,29 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     ws.sheet_view.showGridLines = False
     ncols = 7
 
-    # ── Linha 1: Título completo + logo Compartilhar no canto direito ─────────
+    # ── Linha 1: Título completo + logo Compartilhar encostada no final da col G
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
     c = ws["A1"]
     c.value = "DADOS REPRESENTADAS"
-    c.font = Font(name="Calibri", bold=True, size=13, color="FFFFFF")
+    c.font = Font(name="Calibri", bold=True, size=13, color="000000")
     c.alignment = Alignment(horizontal="center", vertical="center")
-    c.fill = _fill(COR_TITULO)
+    c.fill = _fill(COR_HDR_CINZA)
     c.border = _borda
-    ws.row_dimensions[1].height = 50
+    ws.row_dimensions[1].height = 31.5   # 42 pixels
 
-    # Logo Compartilhar — canto superior direito (âncora F1)
+    # Logo Compartilhar — right-aligned ao final da coluna G
+    # Largura das colunas em px: A=82, B=117, C=313, D=103, E=89, F=75, G=131
+    # Borda direita de G = 910px; logo (155px) inicia em 755px (= 51px dentro de F)
     try:
         from openpyxl.drawing.image import Image as XLImage
+        from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+        from openpyxl.drawing.xdr import XDRPositiveSize2D
+        from openpyxl.utils.units import pixels_to_EMU
         img_c = XLImage(io.BytesIO(base64.b64decode(_LOGO_B64)))
-        img_c.height = 44
-        img_c.width  = 155
-        img_c.anchor = "F1"
+        _logo_w, _logo_h = 155, 36
+        _marker = AnchorMarker(col=5, colOff=pixels_to_EMU(51), row=0, rowOff=pixels_to_EMU(3))
+        _size   = XDRPositiveSize2D(cx=pixels_to_EMU(_logo_w), cy=pixels_to_EMU(_logo_h))
+        img_c.anchor = OneCellAnchor(_from=_marker, ext=_size)
         ws.add_image(img_c)
     except Exception:
         pass
@@ -421,15 +430,15 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
 
     ws.row_dimensions[row_spacer].height = 4
 
-    # ── Cabeçalho de colunas — azul escuro + texto branco ─────────────────────
+    # ── Cabeçalho de colunas — azul claro #C5D9F1, texto azul escuro ───────────
     hdrs = ["CÓD. FAB", "CÓD. REDE", "PRODUTOS", "QTDE P/CX", "PESO CX", "UND.", "PREÇO"]
     for j, h in enumerate(hdrs, 1):
         c = ws.cell(row_hdrs, j, h)
-        c.font = _fnt(bold=True, color="FFFFFF", size=9)
-        c.fill = _fill(COR_TITULO)
+        c.font = _fnt(bold=True, color=COR_TITULO, size=9)
+        c.fill = _fill(COR_COL_HDR)
         c.border = _borda
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
-    ws.row_dimensions[row_hdrs].height = 24
+    ws.row_dimensions[row_hdrs].height = 19.5   # 26 pixels
 
     linha = row_data
     fam_atual = None
@@ -464,10 +473,10 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     ws.merge_cells(f"A{linha}:{get_column_letter(ncols)}{linha}")
     c = ws.cell(linha, 1, f"PRODUTOS SEM VENDA  ({n_nc} itens — OPORTUNIDADE COMERCIAL)")
     c.font = _fnt(bold=True, color=COR_LARANJA_E, size=10)
-    c.fill = _fill(COR_LARANJA)
+    c.fill = _fill(COR_NC_HDR)
     c.border = _borda
     c.alignment = Alignment(horizontal="left", vertical="center")
-    ws.row_dimensions[linha].height = 20
+    ws.row_dimensions[linha].height = 19.5   # 26 pixels
     linha += 1
 
     fam_atual = None
