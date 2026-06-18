@@ -324,13 +324,14 @@ def _merge(ws, row, c1, c2, val, bg, color="000000", bold=False, size=10,
 
 def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
                prods_comprados, prods_nao_comprados, usar_familia=True,
-               rede_logo_b64=None, fab_logo_b64=None, cod_forn=None):
+               rede_logo_b64=None, fab_logo_b64=None, cod_forn=None,
+               mostrar_cod_rede=True):
     """Cria uma aba no workbook com os produtos comprados e não comprados."""
     safe = titulo.replace("/", "-").replace("\\", "-").replace("?", "").replace("*", "") \
                  .replace("[", "").replace("]", "").replace(":", "")[:31]
     ws = wb.create_sheet(safe)
     ws.sheet_view.showGridLines = False
-    ncols = 7
+    ncols = 7 if mostrar_cod_rede else 6
 
     # ── Linha 1: Título completo + logo Compartilhar encostada no final da col G
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
@@ -342,9 +343,9 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     c.border = _borda
     ws.row_dimensions[1].height = 31.5   # 42 pixels
 
-    # Logo Compartilhar — right-aligned ao final da coluna G
-    # Largura das colunas em px: A=82, B=117, C=313, D=103, E=89, F=75, G=131
-    # Borda direita de G = 910px; logo (155px) inicia em 755px (= 51px dentro de F)
+    # Logo Compartilhar — right-aligned à última coluna
+    # 7 colunas (com CÓD. REDE): A=82, B=117, C=313, D=103, E=89, F=75, G=131 → 51px dentro de F (col=5)
+    # 6 colunas (sem CÓD. REDE): A=82, B=313, C=103, D=89, E=75, F=131       → 51px dentro de E (col=4)
     try:
         from openpyxl.drawing.image import Image as XLImage
         from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
@@ -352,7 +353,8 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         from openpyxl.utils.units import pixels_to_EMU
         img_c = XLImage(io.BytesIO(base64.b64decode(_LOGO_B64)))
         _logo_w, _logo_h = 155, 36
-        _marker = AnchorMarker(col=5, colOff=pixels_to_EMU(51), row=0, rowOff=pixels_to_EMU(3))
+        _logo_col = 5 if mostrar_cod_rede else 4  # coluna de ancoragem (0-indexed)
+        _marker = AnchorMarker(col=_logo_col, colOff=pixels_to_EMU(51), row=0, rowOff=pixels_to_EMU(3))
         _size   = XDRPositiveSize2D(cx=pixels_to_EMU(_logo_w), cy=pixels_to_EMU(_logo_h))
         img_c.anchor = OneCellAnchor(_from=_marker, ext=_size)
         ws.add_image(img_c)
@@ -431,7 +433,9 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     ws.row_dimensions[row_spacer].height = 4
 
     # ── Cabeçalho de colunas — azul claro #C5D9F1, texto azul escuro ───────────
-    hdrs = ["CÓD. FAB", "CÓD. REDE", "PRODUTOS", "QTDE P/CX", "PESO CX", "UND.", "PREÇO"]
+    hdrs = (["CÓD. FAB", "CÓD. REDE", "PRODUTOS", "QTDE P/CX", "PESO CX", "UND.", "PREÇO"]
+            if mostrar_cod_rede else
+            ["CÓD. FAB", "PRODUTOS", "QTDE P/CX", "PESO CX", "UND.", "PREÇO"])
     for j, h in enumerate(hdrs, 1):
         c = ws.cell(row_hdrs, j, h)
         c.font = _fnt(bold=True, color=COR_TITULO, size=9)
@@ -454,15 +458,25 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
                 linha += 1
 
         bg = COR_BRANCO if i % 2 == 0 else COR_VERDE_F
-        vals = [
-            (p.get("codigo_fab", ""), "center"),
-            (p.get("codigo_rede", ""), "center"),
-            (p.get("nome", ""), "left"),
-            (p.get("qtde_cx", ""), "center"),
-            (p.get("peso", ""), "center"),
-            (p.get("und", ""), "center"),
-            (p.get("preco", ""), "right"),
-        ]
+        if mostrar_cod_rede:
+            vals = [
+                (p.get("codigo_fab", ""), "center"),
+                (p.get("codigo_rede", ""), "center"),
+                (p.get("nome", ""), "left"),
+                (p.get("qtde_cx", ""), "center"),
+                (p.get("peso", ""), "center"),
+                (p.get("und", ""), "center"),
+                (p.get("preco", ""), "right"),
+            ]
+        else:
+            vals = [
+                (p.get("codigo_fab", ""), "center"),
+                (p.get("nome", ""), "left"),
+                (p.get("qtde_cx", ""), "center"),
+                (p.get("peso", ""), "center"),
+                (p.get("und", ""), "center"),
+                (p.get("preco", ""), "right"),
+            ]
         for j, (v, al) in enumerate(vals, 1):
             _cel(ws, linha, j, v, align=al, bg=bg)
         ws.row_dimensions[linha].height = 17
@@ -489,23 +503,37 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
                 linha += 1
 
         bg = COR_BRANCO if i % 2 == 0 else COR_VERM_F
-        vals = [
-            (p.get("codigo_fab", ""), "center"),
-            (p.get("codigo_rede", ""), "center"),
-            (p.get("nome", ""), "left"),
-            (p.get("qtde_cx", ""), "center"),
-            (p.get("peso", ""), "center"),
-            (p.get("und", ""), "center"),
-            (p.get("preco", ""), "right"),
-        ]
+        if mostrar_cod_rede:
+            vals = [
+                (p.get("codigo_fab", ""), "center"),
+                (p.get("codigo_rede", ""), "center"),
+                (p.get("nome", ""), "left"),
+                (p.get("qtde_cx", ""), "center"),
+                (p.get("peso", ""), "center"),
+                (p.get("und", ""), "center"),
+                (p.get("preco", ""), "right"),
+            ]
+        else:
+            vals = [
+                (p.get("codigo_fab", ""), "center"),
+                (p.get("nome", ""), "left"),
+                (p.get("qtde_cx", ""), "center"),
+                (p.get("peso", ""), "center"),
+                (p.get("und", ""), "center"),
+                (p.get("preco", ""), "right"),
+            ]
         for j, (v, al) in enumerate(vals, 1):
             _cel(ws, linha, j, v, align=al, bg=bg)
         ws.row_dimensions[linha].height = 17
         linha += 1
 
-    # Larguras A–G
-    for col, w in zip("ABCDEFG", [11, 16, 44, 14, 12, 10, 18]):
-        ws.column_dimensions[col].width = w
+    # Larguras de coluna
+    if mostrar_cod_rede:
+        for col, w in zip("ABCDEFG", [11, 16, 44, 14, 12, 10, 18]):
+            ws.column_dimensions[col].width = w
+    else:
+        for col, w in zip("ABCDEF", [11, 44, 14, 12, 10, 18]):
+            ws.column_dimensions[col].width = w
     ws.freeze_panes = f"A{row_data}"
 
     # Configuração de impressão — retrato, todas as colunas em 1 página
@@ -720,6 +748,13 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             continue
 
         prods_cat = banco.produtos_com_codigos(fab["id"], rede["id"])
+        # Se não há códigos cadastrados para esta rede, usa todos os produtos sem CÓD. REDE
+        if not prods_cat:
+            prods_cat = banco.todos_produtos_fabrica(fab["id"])
+            mostrar_cod_rede = False
+        else:
+            mostrar_cod_rede = True
+
         if not prods_cat:
             continue
 
@@ -761,6 +796,7 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             rede_logo_b64=rede_logo if rede_logo else None,
             fab_logo_b64=fab_logo if fab_logo else None,
             cod_forn=cod_forn if cod_forn else None,
+            mostrar_cod_rede=mostrar_cod_rede,
         )
 
         ids_comp_rede = {p["id"] for p in comprados}

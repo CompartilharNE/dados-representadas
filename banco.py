@@ -557,6 +557,17 @@ def produtos_com_codigos(fabrica_id, rede_id):
     return [dict(r) for r in rows]
 
 
+def todos_produtos_fabrica(fabrica_id):
+    """Retorna todos os produtos da fábrica sem filtro de código de rede."""
+    rows = _fetch("""
+        SELECT p.*, '' as codigo_rede
+        FROM produtos p
+        WHERE p.fabrica_id=%s
+        ORDER BY p.familia, p.nome
+    """, (fabrica_id,))
+    return [dict(r) for r in rows]
+
+
 def ultimos_precos(fabrica_id, rede_id):
     """Retorna o último preço unitário faturado por produto_id para a rede."""
     rows = _fetch("""
