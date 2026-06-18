@@ -4,6 +4,7 @@ Compartilhar NE — Dados Representadas
 v2
 """
 import psycopg2
+import bcrypt
 import psycopg2.extras
 import streamlit as st
 
