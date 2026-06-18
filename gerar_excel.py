@@ -799,7 +799,7 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
                 preco_str = _fmt_preco(preco_fat) if preco_fat else ""
                 und_final = p.get("und", "")
             p_com_preco = {**p, "preco": preco_str, "und": und_final}
-            if vd and vd["valor_total"] > 0:
+            if vd and vd["qtd_total"] > 0:   # comprado = quantidade > 0 (inclui bonificações com valor 0)
                 comprados.append({**p_com_preco, **vd})
             else:
                 nao_comprados.append(p_com_preco)
