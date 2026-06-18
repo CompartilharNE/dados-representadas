@@ -217,12 +217,38 @@ elif pagina == "🏭 Fábricas":
                                         value=fab_edit["nome_faturamento"] if fab_edit else "")
         contato_in = st.text_input("Contato (opcional)", value=fab_edit["contato"] if fab_edit else "")
 
+        # ── Logo da fábrica ───────────────────────────────────────────────────
+        st.markdown("**Logo da fábrica** *(aparecerá na planilha ao lado da logo da rede)*")
+        fab_logo_col1, fab_logo_col2 = st.columns([2, 3])
+        with fab_logo_col1:
+            fab_logo_atual = fab_edit.get("logo_b64", "") if fab_edit else ""
+            if fab_logo_atual:
+                st.image(base64.b64decode(fab_logo_atual), width=150, caption="Logo atual")
+            else:
+                st.caption("Nenhuma logo cadastrada")
+        with fab_logo_col2:
+            fab_logo_file = st.file_uploader(
+                "Upload logo (PNG, JPG)", type=["png", "jpg", "jpeg"],
+                key="fab_logo_up", help="Recomendado: fundo branco, aprox. 300×100 px"
+            )
+            if fab_logo_file:
+                st.image(fab_logo_file, width=150, caption="Nova logo (prévia)")
+
         c1, c2 = st.columns([3, 1])
         with c1:
             if st.button("💾 Salvar", use_container_width=True):
                 if nome_in and nome_fat_in:
                     banco.salvar_fabrica(nome_in, nome_fat_in, contato_in,
                                          fab_id=fab_edit["id"] if fab_edit else None)
+                    # Salvar logo se foi enviada
+                    if fab_logo_file and fab_edit:
+                        fab_logo_b64 = base64.b64encode(fab_logo_file.getvalue()).decode()
+                        banco.salvar_logo_fabrica(fab_edit["id"], fab_logo_b64)
+                    elif fab_logo_file:
+                        fab_nova = banco.obter_fabrica_por_nome(nome_in)
+                        if fab_nova:
+                            fab_logo_b64 = base64.b64encode(fab_logo_file.getvalue()).decode()
+                            banco.salvar_logo_fabrica(fab_nova["id"], fab_logo_b64)
                     st.success("Salvo!")
                     st.rerun()
                 else:

@@ -321,7 +321,7 @@ def _merge(ws, row, c1, c2, val, bg, color="000000", bold=False, size=10,
 
 def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
                prods_comprados, prods_nao_comprados, usar_familia=True,
-               rede_logo_b64=None, cod_forn=None):
+               rede_logo_b64=None, fab_logo_b64=None, cod_forn=None):
     """Cria uma aba no workbook com os produtos comprados e não comprados."""
     safe = titulo.replace("/", "-").replace("\\", "-").replace("?", "").replace("*", "") \
                  .replace("[", "").replace("]", "").replace(":", "")[:31]
@@ -329,45 +329,28 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     ws.sheet_view.showGridLines = False
     ncols = 7
 
-    # ── Linha 1: Título ───────────────────────────────────────────────────────
+    # ── Linha 1: Título completo + logo Compartilhar no canto direito ─────────
     ws.merge_cells(f"A1:{get_column_letter(ncols)}1")
     c = ws["A1"]
     c.value = "DADOS REPRESENTADAS"
     c.font = Font(name="Calibri", bold=True, size=13, color="FFFFFF")
     c.alignment = Alignment(horizontal="center", vertical="center")
     c.fill = _fill(COR_TITULO)
-    ws.row_dimensions[1].height = 28
+    c.border = _borda
+    ws.row_dimensions[1].height = 50
 
-    # ── Linha 2: Logos ────────────────────────────────────────────────────────
-    ws.merge_cells(f"A2:{get_column_letter(ncols)}2")
-    ws["A2"].fill = _fill(COR_CINZA)
-    ws["A2"].border = _borda
-    ws.row_dimensions[2].height = 58
-
-    # Logo da rede (esquerda — âncora A2)
-    if rede_logo_b64:
-        try:
-            from openpyxl.drawing.image import Image as XLImage
-            img_r = XLImage(io.BytesIO(base64.b64decode(rede_logo_b64)))
-            img_r.height = 50
-            img_r.width  = 130
-            img_r.anchor = "A2"
-            ws.add_image(img_r)
-        except Exception:
-            pass
-
-    # Logo Compartilhar (direita — âncora E2)
+    # Logo Compartilhar — canto superior direito (âncora F1)
     try:
         from openpyxl.drawing.image import Image as XLImage
         img_c = XLImage(io.BytesIO(base64.b64decode(_LOGO_B64)))
-        img_c.height = 50
+        img_c.height = 44
         img_c.width  = 155
-        img_c.anchor = "E2"
+        img_c.anchor = "F1"
         ws.add_image(img_c)
     except Exception:
         pass
 
-    # ── Linhas 3+: Informações ────────────────────────────────────────────────
+    # ── Linhas 2+: Informações (A-D) + área de logos (E-G) ───────────────────
     info_rows = [
         ("REDE:", rede_nome),
         ("FORNECEDOR:", forn_nome),
@@ -377,30 +360,73 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     if cod_forn:
         info_rows.append(("CÓD. FORNECEDOR:", cod_forn))
 
-    for i, (lb, vl) in enumerate(info_rows, 3):
-        ws.cell(i, 1).value = lb
-        ws.cell(i, 1).font = _fnt(bold=True)
-        ws.cell(i, 1).fill = _fill(COR_CINZA)
-        ws.cell(i, 1).border = _borda
-        ws.merge_cells(f"B{i}:{get_column_letter(ncols)}{i}")
-        ws.cell(i, 2).value = vl
-        ws.cell(i, 2).font = _fnt(bold=True, color=COR_TITULO)
-        ws.cell(i, 2).fill = _fill(COR_CINZA)
-        ws.cell(i, 2).border = _borda
-        ws.row_dimensions[i].height = 18
+    ROW_INFO_START = 2
+    n_info = len(info_rows)
+    logo_h = n_info * 24  # altura px aproximada (18pt × ~1.33 ≈ 24px)
 
-    row_spacer = 3 + len(info_rows)
-    row_hdrs   = row_spacer + 1
-    row_data   = row_hdrs + 1
+    for i, (lb, vl) in enumerate(info_rows, 0):
+        r = ROW_INFO_START + i
+        ws.row_dimensions[r].height = 18
+
+        # Col A: rótulo
+        c_lbl = ws.cell(r, 1)
+        c_lbl.value = lb
+        c_lbl.font = _fnt(bold=True, size=9)
+        c_lbl.fill = _fill(COR_CINZA)
+        c_lbl.border = _borda
+        c_lbl.alignment = Alignment(horizontal="left", vertical="center")
+
+        # Col B:D merged: valor
+        ws.merge_cells(f"B{r}:D{r}")
+        c_val = ws.cell(r, 2)
+        c_val.value = vl
+        c_val.font = _fnt(bold=True, color=COR_TITULO, size=9)
+        c_val.fill = _fill(COR_CINZA)
+        c_val.border = _borda
+        c_val.alignment = Alignment(horizontal="left", vertical="center")
+
+        # Col E:G merged: fundo branco para logos
+        ws.merge_cells(f"E{r}:G{r}")
+        c_bg = ws.cell(r, 5)
+        c_bg.fill = _fill(COR_BRANCO)
+        c_bg.border = _borda
+
+    # Logo da rede — lado esquerdo da área de logos (âncora E2)
+    if rede_logo_b64:
+        try:
+            from openpyxl.drawing.image import Image as XLImage
+            img_r = XLImage(io.BytesIO(base64.b64decode(rede_logo_b64)))
+            img_r.height = logo_h
+            img_r.width  = 130
+            img_r.anchor = f"E{ROW_INFO_START}"
+            ws.add_image(img_r)
+        except Exception:
+            pass
+
+    # Logo da fábrica — lado direito da área de logos (âncora F2)
+    if fab_logo_b64:
+        try:
+            from openpyxl.drawing.image import Image as XLImage
+            img_f = XLImage(io.BytesIO(base64.b64decode(fab_logo_b64)))
+            img_f.height = logo_h
+            img_f.width  = 120
+            img_f.anchor = f"F{ROW_INFO_START}"
+            ws.add_image(img_f)
+        except Exception:
+            pass
+
+    row_spacer = ROW_INFO_START + n_info   # linha separadora
+    row_hdrs   = row_spacer + 1            # cabeçalho de colunas
+    row_data   = row_hdrs + 1              # primeira linha de dados
 
     ws.row_dimensions[row_spacer].height = 4
 
-    # ── Cabeçalho de colunas ──────────────────────────────────────────────────
+    # ── Cabeçalho de colunas — azul escuro + texto branco ─────────────────────
     hdrs = ["CÓD. FAB", "CÓD. REDE", "PRODUTOS", "QTDE P/CX", "PESO CX", "UND.", "PREÇO"]
     for j, h in enumerate(hdrs, 1):
         c = ws.cell(row_hdrs, j, h)
-        c.font = _fnt(bold=True, color="000080", size=9)
-        c.fill = _fill(COR_ROXO)
+        c.font = _fnt(bold=True, color="FFFFFF", size=9)
+        c.fill = _fill(COR_TITULO)
         c.border = _borda
         c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
     ws.row_dimensions[row_hdrs].height = 24
@@ -718,11 +744,13 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
         estados    = rede["estados"].replace(",", " / ")
         titulo_aba = f"{fab_nome[:12]} {rede_nome.split()[-1]}"
         rede_logo  = rede.get("logo_b64", "") or ""
+        fab_logo   = fab.get("logo_b64", "") or ""
         cod_forn   = banco.get_cod_fornecedor(fab["id"], rede["id"])
         n_comp, n_nc, valor = _criar_aba(
             wb, titulo_aba, fab_nome, rede_nome, estados, periodo,
             comprados, nao_comprados, usar_familia=True,
             rede_logo_b64=rede_logo if rede_logo else None,
+            fab_logo_b64=fab_logo if fab_logo else None,
             cod_forn=cod_forn if cod_forn else None,
         )
 

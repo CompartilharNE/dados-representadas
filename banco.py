@@ -128,6 +128,10 @@ def criar_banco():
             cur.execute("""
                 ALTER TABLE redes ADD COLUMN IF NOT EXISTS logo_b64 TEXT DEFAULT ''
             """)
+            # Logo da fábrica
+            cur.execute("""
+                ALTER TABLE fabricas ADD COLUMN IF NOT EXISTS logo_b64 TEXT DEFAULT ''
+            """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS codigos_fornecedor (
                     id SERIAL PRIMARY KEY,
@@ -235,6 +239,11 @@ def salvar_rede(nome, filtro_nome, estados, excluir_palavras="", rede_id=None):
 
 def salvar_logo_rede(rede_id, logo_b64):
     _run("UPDATE redes SET logo_b64=%s WHERE id=%s", (logo_b64, rede_id))
+
+
+def salvar_logo_fabrica(fab_id, logo_b64):
+    """Salva a logo da fábrica (base64) no banco."""
+    _run("UPDATE fabricas SET logo_b64=%s WHERE id=%s", (logo_b64, fab_id))
 
 
 def salvar_cod_fornecedor(fabrica_id, rede_id, codigo):
