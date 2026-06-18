@@ -39,19 +39,87 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# ── AUTENTICAÇÃO ──────────────────────────────────────────────────────────────
+def _check_admin(username, senha):
+    """Verifica credenciais do admin via st.secrets."""
+    try:
+        adm_user = st.secrets["auth"]["admin_username"]
+        adm_pass = st.secrets["auth"]["admin_password"]
+        return username.strip().lower() == adm_user.strip().lower() and senha == adm_pass
+    except Exception:
+        return False
+
+def _fazer_login(username, senha):
+    """Tenta login como admin (secrets) ou usuário (banco). Retorna perfil ou None."""
+    if _check_admin(username, senha):
+        return "admin"
+    usuario = banco.verificar_login(username, senha)
+    if usuario:
+        return usuario["perfil"]
+    return None
+
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.perfil    = None
+    st.session_state.username  = None
+
+if not st.session_state.logged_in:
+    col1, col2, col3 = st.columns([1, 1.2, 1])
+    with col2:
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        try:
+            st.image("compartilhar_logo.svg", use_container_width=True)
+        except Exception:
+            pass
+        st.markdown("### Dados Representadas")
+        st.caption("Acesso restrito — Compartilhar NE")
+        with st.form("login_form"):
+            username_inp = st.text_input("Usuário")
+            senha_inp    = st.text_input("Senha", type="password")
+            entrar       = st.form_submit_button("Entrar", use_container_width=True, type="primary")
+            if entrar:
+                perfil = _fazer_login(username_inp, senha_inp)
+                if perfil:
+                    st.session_state.logged_in = True
+                    st.session_state.perfil    = perfil
+                    st.session_state.username  = username_inp.strip().lower()
+                    st.rerun()
+                else:
+                    st.error("Usuário ou senha incorretos.")
+    st.stop()
+
 # ── NAVEGAÇÃO SIDEBAR ─────────────────────────────────────────────────────────
+_is_admin = st.session_state.perfil == "admin"
+
 with st.sidebar:
     st.image("compartilhar_logo.svg", use_container_width=True)
     st.markdown('<div class="sidebar-title" style="margin-top:6px">📊 Dados Representadas</div>', unsafe_allow_html=True)
     st.markdown('<div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:12px">Compartilhar NE</div>', unsafe_allow_html=True)
 
-    pagina = st.radio(
-        "Navegação",
-        ["🗂️ Gerar Relatório", "🏭 Fábricas", "🏪 Redes / Clientes",
-         "📦 Produtos", "🔢 Códigos da Rede", "💰 Tabela de Preço",
-         "📥 Importar Faturamento"],
-        label_visibility="collapsed",
+    if _is_admin:
+        opcoes_nav = [
+            "🗂️ Gerar Relatório", "🏭 Fábricas", "🏪 Redes / Clientes",
+            "📦 Produtos", "🔢 Códigos da Rede", "💰 Tabela de Preço",
+            "📥 Importar Faturamento", "👥 Usuários",
+        ]
+    else:
+        opcoes_nav = ["🗂️ Gerar Relatório"]
+
+    pagina = st.radio("Navegação", opcoes_nav, label_visibility="collapsed")
+
+    st.markdown("---")
+    st.markdown(
+        f'<div style="font-size:11px;color:rgba(39,42,74,0.5)">'
+        f'👤 {st.session_state.username} '
+        f'<span style="background:#e63946;color:#fff;padding:1px 6px;border-radius:4px;font-size:10px">'
+        f'{st.session_state.perfil}</span></div>',
+        unsafe_allow_html=True,
     )
+    if st.button("Sair", use_container_width=True):
+        st.session_state.logged_in = False
+        st.session_state.perfil    = None
+        st.session_state.username  = None
+        st.rerun()
     st.markdown('<div style="font-size:10px;color:rgba(255,255,255,0.3)">Banco: Supabase PostgreSQL</div>',
                 unsafe_allow_html=True)
 
@@ -295,6 +363,7 @@ elif pagina == "🏪 Redes / Clientes":
             excluir_in = st.text_input("Palavras a excluir (separadas por vírgula)",
                                        value=r_edit["excluir_palavras"] if r_edit else "")
 
+        # ── Logo da rede ──────────────────────────────────────────────────────
         st.markdown("**Logo da rede** *(aparecerá na planilha ao lado da logo Compartilhar)*")
         logo_col1, logo_col2 = st.columns([2, 3])
         with logo_col1:
@@ -305,7 +374,7 @@ elif pagina == "🏪 Redes / Clientes":
                 st.caption("Nenhuma logo cadastrada")
         with logo_col2:
             logo_file = st.file_uploader(
-                "Upload logo (PNG, JPG)", type=["png","jpg","jpeg"],
+                "Upload logo (PNG, JPG)", type=["png", "jpg", "jpeg"],
                 key="rede_logo_up", help="Recomendado: fundo branco, aprox. 300×100 px"
             )
             if logo_file:
@@ -317,12 +386,16 @@ elif pagina == "🏪 Redes / Clientes":
                 if nome_in and filtro_in:
                     banco.salvar_rede(nome_in, filtro_in, estados_in, excluir_in,
                                       rede_id=r_edit["id"] if r_edit else None)
+                    # Salvar logo se foi enviada
                     if logo_file and r_edit:
-                        banco.salvar_logo_rede(r_edit["id"], base64.b64encode(logo_file.getvalue()).decode())
+                        logo_b64 = base64.b64encode(logo_file.getvalue()).decode()
+                        banco.salvar_logo_rede(r_edit["id"], logo_b64)
                     elif logo_file:
+                        # Busca o id recém-criado
                         rede_nova = banco.obter_rede_por_nome(nome_in)
                         if rede_nova:
-                            banco.salvar_logo_rede(rede_nova["id"], base64.b64encode(logo_file.getvalue()).decode())
+                            logo_b64 = base64.b64encode(logo_file.getvalue()).decode()
+                            banco.salvar_logo_rede(rede_nova["id"], logo_b64)
                     st.success("Salvo!")
                     st.rerun()
                 else:
@@ -336,22 +409,35 @@ elif pagina == "🏪 Redes / Clientes":
                 except Exception as e:
                     st.error(f"Erro ao excluir: {e}")
 
+    # ── Códigos de fornecedor por fábrica ─────────────────────────────────────
     st.markdown("---")
     st.subheader("🔑 Código de Fornecedor por Fábrica")
-    st.caption("Cada fábrica pode ter um código de fornecedor diferente para cada rede. Este código aparece na planilha.")
+    st.caption(
+        "Cada fábrica pode ter um código de fornecedor diferente para cada rede. "
+        "Este código aparecerá na planilha gerada."
+    )
 
     fabricas_all = banco.listar_fabricas()
     redes_cf     = banco.listar_redes()
-    cf_col1, _ = st.columns(2)
+
+    cf_col1, cf_col2 = st.columns(2)
     with cf_col1:
         rede_cf = st.selectbox("Rede / Cliente", [r["nome"] for r in redes_cf], key="cf_rede")
     rede_cf_obj = next((r for r in redes_cf if r["nome"] == rede_cf), None)
 
     if rede_cf_obj:
-        cods_existentes = {c["fabrica_id"]: c["codigo"] for c in banco.listar_cods_forn_por_rede(rede_cf_obj["id"])}
-        rows_cf = [{"Fábrica": f["nome"], "Código Fornecedor": cods_existentes.get(f["id"], "—")} for f in fabricas_all]
+        cods_existentes = {
+            c["fabrica_id"]: c["codigo"]
+            for c in banco.listar_cods_forn_por_rede(rede_cf_obj["id"])
+        }
+        st.markdown(f"**Códigos cadastrados para {rede_cf}:**")
+        rows_cf = []
+        for fab in fabricas_all:
+            cod = cods_existentes.get(fab["id"], "—")
+            rows_cf.append({"Fábrica": fab["nome"], "Código Fornecedor": cod})
         st.dataframe(pd.DataFrame(rows_cf), use_container_width=True, hide_index=True)
 
+        st.markdown("**Adicionar / Atualizar código:**")
         cf2, cf3, cf4 = st.columns([2, 2, 1])
         with cf2:
             fab_cf = st.selectbox("Fábrica", [f["nome"] for f in fabricas_all], key="cf_fab")
@@ -752,6 +838,7 @@ elif pagina == "💰 Tabela de Preço":
     if fab_obj and rede_obj:
         tab_atual = banco.obter_tabela_precos(rede_obj["id"], fab_obj["id"])
 
+        # ── Tabela atual ──────────────────────────────────────────────────────
         if tab_atual:
             st.markdown(f"**{len(tab_atual)} itens cadastrados** — {rede_sel} × {fab_sel}")
             df_atual = pd.DataFrame([{
@@ -773,10 +860,13 @@ elif pagina == "💰 Tabela de Preço":
             st.info("Nenhuma tabela de preços cadastrada para esta combinação. Faça o upload abaixo.")
 
         st.markdown("---")
+
+        # ── Upload ────────────────────────────────────────────────────────────
         st.subheader("📂 Importar tabela de preços (.xlsx)")
         st.markdown(
-            "O arquivo Excel deve ter as colunas de **código da fábrica**, **unidade** e **preço**. "
-            "Após o upload, mapeie as colunas abaixo."
+            "O arquivo Excel deve ter **pelo menos** as colunas de: "
+            "**código da fábrica**, **unidade** e **preço**. "
+            "Após o upload, mapeie as colunas correspondentes abaixo."
         )
 
         arquivo = st.file_uploader("Selecione o arquivo Excel", type=["xlsx", "xls"], key="tp_upload")
@@ -813,6 +903,7 @@ elif pagina == "💰 Tabela de Preço":
                                             key="tp_col_prec")
 
                 if col_cod != "(não usar)":
+                    # Preview
                     preview_cols = {col_cod: "Cód. Fab"}
                     if col_desc != "(não usar)": preview_cols[col_desc] = "Descrição"
                     if col_und  != "(não usar)": preview_cols[col_und]  = "Unidade"
@@ -828,6 +919,7 @@ elif pagina == "💰 Tabela de Preço":
                         if col_prec == "(não usar)":
                             st.error("Selecione a coluna de Preço.")
                         else:
+                            # Monta lista de itens
                             items = []
                             for _, row in df_raw.iterrows():
                                 cod = str(row.get(col_cod, "") or "").strip()
@@ -845,8 +937,10 @@ elif pagina == "💰 Tabela de Preço":
                                     "unidade":    str(row.get(col_und,  "") or "") if col_und  != "(não usar)" else "",
                                     "preco":      preco_val,
                                 })
+
                             if items:
                                 banco.salvar_tabela_precos(rede_obj["id"], fab_obj["id"], items)
+                                vinc = sum(1 for it in items if it["codigo_fab"])
                                 st.success(f"✅ {len(items)} itens salvos para {rede_sel} × {fab_sel}!")
                                 st.rerun()
                             else:
@@ -857,10 +951,11 @@ elif pagina == "💰 Tabela de Preço":
             except Exception as e:
                 st.error(f"Erro ao ler arquivo: {e}")
 
+        # ── Limpar tabela ─────────────────────────────────────────────────────
         if tab_atual:
             st.markdown("---")
             with st.expander("🗑️ Remover tabela de preços"):
-                st.warning(f"Isso removerá todos os {len(tab_atual)} itens de {rede_sel} × {fab_sel}.")
+                st.warning(f"Isso removerá todos os {len(tab_atual)} itens da tabela de {rede_sel} × {fab_sel}.")
                 if st.button("🗑️ Confirmar remoção", key="tp_limpar"):
                     banco.limpar_tabela_precos(rede_obj["id"], fab_obj["id"])
                     st.success("Tabela removida.")
@@ -1029,7 +1124,6 @@ elif pagina == "📥 Importar Faturamento":
                 banco.limpar_todo_faturamento()
                 st.success("Faturamento apagado.")
                 st.rerun()
-
 
 # ── PÁGINA: USUÁRIOS (admin only) ─────────────────────────────────────────────
 elif pagina == "👥 Usuários" and _is_admin:
