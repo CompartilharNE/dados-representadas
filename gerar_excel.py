@@ -639,12 +639,14 @@ def _criar_resumo(wb, periodo, resultados):
         linha += 1
 
         # Linhas de loja (outline 1)
-        n_cat_rede = res["n_cat"]   # total cadastrados na rede — denominador correto
+        # Positivação da loja = sobre o que a REDE comprou (n_comp_rede), não sobre n_cat
+        # Ex: rede comprou 9 itens, loja comprou 5 → 5/9 = 55.6%
+        n_comp_rede = res["n_comp"]
         for k, loja in enumerate(res.get("lojas", [])):
             bg_l = cor_l1 if k % 2 == 0 else cor_l2
             n_comp_loja = loja.get("n_produtos", 0)
-            n_nc_loja   = max(0, n_cat_rede - n_comp_loja)
-            porc_loja   = round(n_comp_loja / n_cat_rede * 100, 1) if n_cat_rede else 0
+            n_nc_loja   = max(0, n_comp_rede - n_comp_loja)
+            porc_loja   = round(n_comp_loja / n_comp_rede * 100, 1) if n_comp_rede else 0
 
             ws.merge_cells(f"A{linha}:C{linha}")
             c_ = ws.cell(linha, 1, f"    ↳ {loja['nome_faturamento']}")
