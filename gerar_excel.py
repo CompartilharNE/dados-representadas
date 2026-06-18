@@ -340,12 +340,10 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
     c.font = Font(name="Calibri", bold=True, size=13, color="000000")
     c.alignment = Alignment(horizontal="center", vertical="center")
     c.fill = _fill(COR_HDR_CINZA)
-    c.border = _borda
+    c.border = Border()   # sem borda na linha 1
     ws.row_dimensions[1].height = 31.5   # 42 pixels
 
-    # Logo Compartilhar — right-aligned à última coluna
-    # 7 colunas (com CÓD. REDE): A=82, B=117, C=313, D=103, E=89, F=75, G=131 → 51px dentro de F (col=5)
-    # 6 colunas (sem CÓD. REDE): A=82, B=313, C=103, D=89, E=75, F=131       → 51px dentro de E (col=4)
+    # Logo Compartilhar — right-aligned à última coluna (recuada 20px do limite)
     try:
         from openpyxl.drawing.image import Image as XLImage
         from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
@@ -353,8 +351,9 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         from openpyxl.utils.units import pixels_to_EMU
         img_c = XLImage(io.BytesIO(base64.b64decode(_LOGO_B64)))
         _logo_w, _logo_h = 155, 36
-        _logo_col = 5 if mostrar_cod_rede else 4  # coluna de ancoragem (0-indexed)
-        _marker = AnchorMarker(col=_logo_col, colOff=pixels_to_EMU(51), row=0, rowOff=pixels_to_EMU(3))
+        _logo_col = 5 if mostrar_cod_rede else 4
+        _logo_off = 20
+        _marker = AnchorMarker(col=_logo_col, colOff=pixels_to_EMU(_logo_off), row=0, rowOff=pixels_to_EMU(3))
         _size   = XDRPositiveSize2D(cx=pixels_to_EMU(_logo_w), cy=pixels_to_EMU(_logo_h))
         img_c.anchor = OneCellAnchor(_from=_marker, ext=_size)
         ws.add_image(img_c)
@@ -402,29 +401,47 @@ def _criar_aba(wb, titulo, forn_nome, rede_nome, estados, periodo,
         c_bg.fill = _fill(COR_BRANCO)
         c_bg.border = Border()
 
-    # Logo da rede — lado esquerdo da área de logos (âncora E2)
-    if rede_logo_b64:
-        try:
-            from openpyxl.drawing.image import Image as XLImage
-            img_r = XLImage(io.BytesIO(base64.b64decode(rede_logo_b64)))
-            img_r.height = logo_h
-            img_r.width  = 130
-            img_r.anchor = f"E{ROW_INFO_START}"
-            ws.add_image(img_r)
-        except Exception:
-            pass
+    # Logos rede + fábrica — lado a lado, dimensão fixa, ancoragem pixel-precisa
+    _LOGO_FIX_W = 130
+    _LOGO_FIX_H = 80
+    _e_col_px = 89 if mostrar_cod_rede else 75
+    _rede_start_px = 5
+    _fab_start_px  = _rede_start_px + _LOGO_FIX_W + 5  # 140px a partir de E
 
-    # Logo da fábrica — lado direito da área de logos (âncora F2)
-    if fab_logo_b64:
-        try:
-            from openpyxl.drawing.image import Image as XLImage
+    def _logo_anchor(px_from_e, row_0indexed):
+        if px_from_e < _e_col_px:
+            return 4, px_from_e, row_0indexed
+        else:
+            return 5, px_from_e - _e_col_px, row_0indexed
+
+    try:
+        from openpyxl.drawing.image import Image as XLImage
+        from openpyxl.drawing.spreadsheet_drawing import OneCellAnchor, AnchorMarker
+        from openpyxl.drawing.xdr import XDRPositiveSize2D
+        from openpyxl.utils.units import pixels_to_EMU
+
+        if rede_logo_b64:
+            col_r, off_r, row_r = _logo_anchor(_rede_start_px, ROW_INFO_START - 1)
+            img_r = XLImage(io.BytesIO(base64.b64decode(rede_logo_b64)))
+            img_r.anchor = OneCellAnchor(
+                _from=AnchorMarker(col=col_r, colOff=pixels_to_EMU(off_r),
+                                   row=row_r, rowOff=pixels_to_EMU(5)),
+                ext=XDRPositiveSize2D(cx=pixels_to_EMU(_LOGO_FIX_W), cy=pixels_to_EMU(_LOGO_FIX_H))
+            )
+            ws.add_image(img_r)
+
+        if fab_logo_b64:
+            _fab_px = _fab_start_px if rede_logo_b64 else _rede_start_px
+            col_f, off_f, row_f = _logo_anchor(_fab_px, ROW_INFO_START - 1)
             img_f = XLImage(io.BytesIO(base64.b64decode(fab_logo_b64)))
-            img_f.height = logo_h
-            img_f.width  = 120
-            img_f.anchor = f"F{ROW_INFO_START}"
+            img_f.anchor = OneCellAnchor(
+                _from=AnchorMarker(col=col_f, colOff=pixels_to_EMU(off_f),
+                                   row=row_f, rowOff=pixels_to_EMU(5)),
+                ext=XDRPositiveSize2D(cx=pixels_to_EMU(_LOGO_FIX_W), cy=pixels_to_EMU(_LOGO_FIX_H))
+            )
             ws.add_image(img_f)
-        except Exception:
-            pass
+    except Exception:
+        pass
 
     row_spacer = ROW_INFO_START + n_info   # linha separadora
     row_hdrs   = row_spacer + 1            # cabeçalho de colunas
