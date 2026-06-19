@@ -10,6 +10,11 @@ import base64
 import banco
 import gerar_excel
 import importar as imp
+try:
+    import extra_streamlit_components as stx
+    _COOKIES_OK = True
+except ImportError:
+    _COOKIES_OK = False
 
 # ── CONFIGURAÇÃO DA PÁGINA ────────────────────────────────────────────────────
 st.set_page_config(
@@ -55,6 +60,36 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+
+# ── COOKIE MANAGER ───────────────────────────────────────────────────────────
+@st.cache_resource
+def _get_cookie_manager():
+    return stx.CookieManager(key="dr_cm") if _COOKIES_OK else None
+
+_cm = _get_cookie_manager() if _COOKIES_OK else None
+
+def _cookie_get(name):
+    try:
+        return _cm.get(name) if _cm else None
+    except Exception:
+        return None
+
+def _cookie_set(name, value, days=30):
+    try:
+        if _cm:
+            exp = datetime.datetime.now() + datetime.timedelta(days=days)
+            _cm.set(name, value, expires_at=exp)
+    except Exception:
+        pass
+
+def _cookie_delete(name):
+    try:
+        if _cm:
+            _cm.delete(name)
+    except Exception:
+        pass
+
+
 # ── AUTENTICAÇÃO ──────────────────────────────────────────────────────────────
 def _check_admin(username, senha):
     """Verifica credenciais do admin via st.secrets."""
@@ -79,6 +114,23 @@ if "logged_in" not in st.session_state:
     st.session_state.perfil    = None
     st.session_state.username  = None
 
+# Auto-login via cookie "lembrar-me"
+if not st.session_state.logged_in and _cm:
+    _c_user = _cookie_get("dr_u")
+    _c_pass = _cookie_get("dr_p")
+    if _c_user and _c_pass:
+        try:
+            _c_pass_dec = base64.b64decode(_c_pass.encode()).decode()
+            _c_perfil   = _fazer_login(_c_user, _c_pass_dec)
+            if _c_perfil:
+                st.session_state.logged_in = True
+                st.session_state.perfil    = _c_perfil
+                st.session_state.username  = _c_user
+                st.rerun()
+        except Exception:
+            _cookie_delete("dr_u")
+            _cookie_delete("dr_p")
+
 if not st.session_state.logged_in:
     col1, col2, col3 = st.columns([1, 1.2, 1])
     with col2:
@@ -92,6 +144,7 @@ if not st.session_state.logged_in:
         with st.form("login_form"):
             username_inp = st.text_input("Usuário")
             senha_inp    = st.text_input("Senha", type="password")
+            lembrar      = st.checkbox("Lembrar login e senha neste dispositivo", value=False)
             entrar       = st.form_submit_button("Entrar", use_container_width=True, type="primary")
             if entrar:
                 perfil = _fazer_login(username_inp, senha_inp)
@@ -99,6 +152,12 @@ if not st.session_state.logged_in:
                     st.session_state.logged_in = True
                     st.session_state.perfil    = perfil
                     st.session_state.username  = username_inp.strip().lower()
+                    if lembrar:
+                        _cookie_set("dr_u", username_inp.strip().lower(), days=30)
+                        _cookie_set("dr_p", base64.b64encode(senha_inp.encode()).decode(), days=30)
+                    else:
+                        _cookie_delete("dr_u")
+                        _cookie_delete("dr_p")
                     st.rerun()
                 else:
                     st.error("Usuário ou senha incorretos.")
@@ -132,6 +191,8 @@ with st.sidebar:
         unsafe_allow_html=True,
     )
     if st.button("↩ Sair", use_container_width=False):
+        _cookie_delete("dr_u")
+        _cookie_delete("dr_p")
         st.session_state.logged_in = False
         st.session_state.perfil    = None
         st.session_state.username  = None
@@ -564,28 +625,56 @@ elif pagina == "🏬 Lojas":
     if sem_rede:
         st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
 
+    ufs_br = ["","AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
+              "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
+
     if lojas_all:
-        header = st.columns([4, 1, 2, 1])
+        header = st.columns([4, 1, 2, 1, 1])
         header[0].markdown("**Nome da loja**")
         header[1].markdown("**UF**")
         header[2].markdown("**Rede**")
         header[3].markdown("")
+        header[4].markdown("")
         st.markdown('<hr style="margin:4px 0">', unsafe_allow_html=True)
 
         for loja in lojas_all:
-            c1, c2, c3, c4 = st.columns([4, 1, 2, 1])
+            lid = loja["id"]
+            c1, c2, c3, c4, c5 = st.columns([4, 1, 2, 1, 1])
             uf_label = loja.get("estado") or "?"
             uf_color = "#1565c0" if loja.get("estado") else "#e65100"
             c1.markdown(f'<span style="font-size:13px">{loja["nome_faturamento"]}</span>', unsafe_allow_html=True)
             c2.markdown(
-                f'<span style="background:{"#e3f2fd" if loja.get("estado") else "#fff3e0"};'
+                f'<span style="background:{"#e3f2fd" if loja.get("estado") else "#fff3e0"};' 
                 f'color:{uf_color};padding:2px 8px;border-radius:6px;font-size:12px">{uf_label}</span>',
                 unsafe_allow_html=True,
             )
             c3.markdown(f'<span style="font-size:13px;color:#555">{loja.get("rede_nome") or "—"}</span>', unsafe_allow_html=True)
-            if c4.button("🗑️", key=f"del_loja_{loja['id']}", help="Remover loja"):
-                banco.deletar_loja(loja["id"])
+            if c4.button("✏️", key=f"edit_loja_{lid}", help="Editar loja"):
+                st.session_state[f"_edit_loja_{lid}"] = not st.session_state.get(f"_edit_loja_{lid}", False)
+            if c5.button("🗑️", key=f"del_loja_{lid}", help="Remover loja"):
+                banco.deletar_loja(lid)
                 st.rerun()
+
+            # Formulário inline de edição
+            if st.session_state.get(f"_edit_loja_{lid}"):
+                with st.form(f"form_edit_loja_{lid}"):
+                    ec1, ec2, ec3 = st.columns([4, 1, 2])
+                    novo_nome = ec1.text_input("Nome da loja", value=loja["nome_faturamento"], key=f"en_{lid}")
+                    uf_idx = ufs_br.index(loja.get("estado") or "") if (loja.get("estado") or "") in ufs_br else 0
+                    novo_uf  = ec2.selectbox("UF", ufs_br, index=uf_idx, key=f"eu_{lid}")
+                    rede_nomes = [r["nome"] for r in redes_all]
+                    rede_idx = rede_nomes.index(loja["rede_nome"]) if loja.get("rede_nome") in rede_nomes else 0
+                    novo_rede = ec3.selectbox("Rede", rede_nomes, index=rede_idx, key=f"er_{lid}")
+                    salvar_e, cancelar_e = st.columns(2)
+                    if salvar_e.form_submit_button("💾 Salvar", use_container_width=True):
+                        rede_obj_e = next((r for r in redes_all if r["nome"] == novo_rede), None)
+                        if rede_obj_e and novo_nome.strip():
+                            banco.atualizar_loja(lid, rede_obj_e["id"], novo_nome.strip(), novo_uf)
+                            del st.session_state[f"_edit_loja_{lid}"]
+                            st.rerun()
+                    if cancelar_e.form_submit_button("Cancelar", use_container_width=True):
+                        del st.session_state[f"_edit_loja_{lid}"]
+                        st.rerun()
     else:
         st.info("Nenhuma loja cadastrada ainda.")
 

@@ -517,17 +517,25 @@ def listar_lojas_com_rede(rede_id=None):
     return [dict(r) for r in rows]
 
 
+
+def _norm_str(s):
+    """Normaliza string: minúsculas, sem acentos."""
+    import unicodedata
+    return unicodedata.normalize("NFD", str(s).lower()).encode("ascii", "ignore").decode("ascii").strip()
+
+
 def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
     """
     Importa lojas de um DataFrame com colunas Nome, UF e Rede.
-    Faz UPSERT: se a loja ja existe, atualiza rede_id e estado.
+    UPSERT: se a loja já existe, SUBSTITUI rede_id e estado.
     Retorna (n_ok, redes_nao_encontradas, erros).
     """
     redes = listar_redes()
-    redes_map = {r["nome"].strip().lower(): r for r in redes}
+    # Mapa sem acento para matching robusto (Assaí = Assai)
+    redes_map = {_norm_str(r["nome"]): r for r in redes}
 
     def _match_rede(nome_planilha):
-        n = nome_planilha.strip().lower()
+        n = _norm_str(nome_planilha)
         if n in redes_map:
             return redes_map[n]
         for k, v in redes_map.items():
@@ -560,14 +568,21 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                     uf = ""
 
                 try:
-                    cur.execute("""
-                        INSERT INTO lojas (rede_id, nome_faturamento, estado)
-                        VALUES (%s, %s, %s)
-                        ON CONFLICT (nome_faturamento) DO UPDATE SET
-                            rede_id = EXCLUDED.rede_id,
-                            estado  = CASE WHEN EXCLUDED.estado != '' THEN EXCLUDED.estado
-                                          ELSE lojas.estado END
-                    """, (rede["id"], nome, uf))
+                    cur.execute(
+                        "SELECT id, estado FROM lojas WHERE nome_faturamento=%s", (nome,)
+                    )
+                    existing = cur.fetchone()
+                    if existing:
+                        old_estado = existing[1] or ""
+                        cur.execute(
+                            "UPDATE lojas SET rede_id=%s, estado=%s WHERE id=%s",
+                            (rede["id"], uf if uf else old_estado, existing[0])
+                        )
+                    else:
+                        cur.execute(
+                            "INSERT INTO lojas (rede_id, nome_faturamento, estado) VALUES (%s,%s,%s)",
+                            (rede["id"], nome, uf)
+                        )
                     n_ok += 1
                 except Exception as e:
                     erros.append(str(e))
@@ -591,14 +606,33 @@ def deletar_loja(loja_id):
 
 
 def salvar_loja_manual(rede_id, nome_faturamento, uf):
-    """Cria ou atualiza uma loja manualmente."""
-    _run("""
-        INSERT INTO lojas (rede_id, nome_faturamento, estado)
-        VALUES (%s, %s, %s)
-        ON CONFLICT (nome_faturamento) DO UPDATE SET
-            rede_id = EXCLUDED.rede_id,
-            estado  = EXCLUDED.estado
-    """, (rede_id, nome_faturamento, uf))
+    """Cria loja ou atualiza se já existir (por nome_faturamento)."""
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM lojas WHERE nome_faturamento=%s", (nome_faturamento,))
+            ex = cur.fetchone()
+            if ex:
+                cur.execute(
+                    "UPDATE lojas SET rede_id=%s, estado=%s WHERE id=%s",
+                    (rede_id, uf, ex[0])
+                )
+            else:
+                cur.execute(
+                    "INSERT INTO lojas (rede_id, nome_faturamento, estado) VALUES (%s,%s,%s)",
+                    (rede_id, nome_faturamento, uf)
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def atualizar_loja(loja_id, rede_id, nome_faturamento, uf):
+    """Atualiza dados de uma loja existente."""
+    _run(
+        "UPDATE lojas SET rede_id=%s, nome_faturamento=%s, estado=%s WHERE id=%s",
+        (rede_id, nome_faturamento, uf, loja_id)
+    )
 
 
 # ── FATURAMENTO ───────────────────────────────────────────────────────────────
