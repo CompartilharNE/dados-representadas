@@ -706,9 +706,13 @@ elif pagina == "🔢 Códigos da Rede":
                                 return f
                         return None
 
-                    df_m2["fab_obj"] = df_m2["fabrica_nome"].apply(_match_fab)
-                    nao_rec = df_m2[df_m2["fab_obj"].isna()]["fabrica_nome"].unique().tolist()
-                    df_ok   = df_m2[df_m2["fab_obj"].notna()]
+                    def _match_fab_id(nome_planilha):
+                        f = _match_fab(nome_planilha)
+                        return f["id"] if f else None
+
+                    df_m2["fab_id"] = df_m2["fabrica_nome"].apply(_match_fab_id)
+                    nao_rec = df_m2[df_m2["fab_id"].isna()]["fabrica_nome"].unique().tolist()
+                    df_ok   = df_m2[df_m2["fab_id"].notna()].copy()
 
                     resumo = df_ok.groupby("fabrica_nome").size().reset_index(name="qtd")
                     st.markdown(f"**{len(df_ok)} pares válidos** encontrados:")
@@ -719,7 +723,10 @@ elif pagina == "🔢 Códigos da Rede":
 
                     if len(df_ok) > 0 and st.button("✅ Importar todas as fábricas", use_container_width=True, type="primary", key="btn_multi"):
                         total_ok = total_nao = 0
-                        for fab_obj, grupo in df_ok.groupby("fab_obj"):
+                        for fab_id, grupo in df_ok.groupby("fab_id"):
+                            fab_obj = next((f for f in fabricas if f["id"] == fab_id), None)
+                            if not fab_obj:
+                                continue
                             df_par = grupo[["codigo_fab","codigo_rede"]].copy()
                             n_imp, nao_enc = banco.importar_codigos_rede_df(fab_obj["id"], rede_multi["id"], df_par)
                             total_ok  += n_imp
