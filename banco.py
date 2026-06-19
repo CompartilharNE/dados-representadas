@@ -1,3 +1,4 @@
+# v2.1 — lojas feature
 """
 banco.py — Operacoes do banco PostgreSQL (Supabase)
 Compartilhar NE — Dados Representadas
