@@ -570,11 +570,10 @@ def _norm_str(s):
 def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
     """
     Importa lojas de um DataFrame com colunas Nome, UF e Rede.
-    UPSERT: se a loja já existe, SUBSTITUI rede_id e estado.
-    Retorna (n_ok, redes_nao_encontradas, erros).
+    UPSERT: se a loja ja existe, SUBSTITUI rede_id e estado.
+    Retorna (n_ok, redes_nao_encontradas, erros, log_detalhado).
     """
     redes = listar_redes()
-    # Mapa sem acento para matching robusto (Assaí = Assai)
     redes_map = {_norm_str(r["nome"]): r for r in redes}
 
     def _match_rede(nome_planilha):
@@ -589,6 +588,7 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
     n_ok = 0
     nao_enc = set()
     erros = []
+    log = []
 
     conn = conectar()
     try:
@@ -605,24 +605,22 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                 if not rede:
                     if r_nom and r_nom not in ("nan", "None"):
                         nao_enc.add(r_nom)
+                    log.append({"nome": nome, "status": "rede_nao_encontrada", "rede_planilha": r_nom})
                     continue
 
                 if uf in ("nan", "None"):
                     uf = ""
 
-                # Se UF ainda vazia, tenta derivar do nome da rede (ex: "Assai BA" → "BA")
                 if not uf:
                     partes = rede["nome"].strip().split()
                     if partes and len(partes[-1]) == 2 and partes[-1].isupper():
                         uf = partes[-1]
-                # Se ainda vazia, usa estado da rede quando ela tem só um estado configurado
                 if not uf:
                     estados_rede = [e.strip() for e in (rede.get("estados") or "").split(",") if e.strip()]
                     if len(estados_rede) == 1:
                         uf = estados_rede[0]
 
                 try:
-                    # Matching case-insensitive (evita duplicatas por diferenca de maiusculas)
                     cur.execute(
                         "SELECT id, nome_faturamento, estado FROM lojas WHERE LOWER(nome_faturamento)=LOWER(%s)",
                         (nome,)
@@ -634,19 +632,25 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                             "UPDATE lojas SET rede_id=%s, estado=%s, nome_faturamento=%s WHERE id=%s",
                             (rede["id"], uf if uf else old_estado, nome, existing[0])
                         )
+                        log.append({"nome": nome, "status": "atualizado",
+                                    "rede_planilha": r_nom, "rede_sistema": rede["nome"],
+                                    "nome_banco": existing[1], "uf": uf})
                     else:
                         cur.execute(
                             "INSERT INTO lojas (rede_id, nome_faturamento, estado) VALUES (%s,%s,%s)",
                             (rede["id"], nome, uf)
                         )
+                        log.append({"nome": nome, "status": "inserido",
+                                    "rede_planilha": r_nom, "rede_sistema": rede["nome"], "uf": uf})
                     n_ok += 1
                 except Exception as e:
                     erros.append(str(e))
+                    log.append({"nome": nome, "status": "erro", "erro": str(e)})
         conn.commit()
     finally:
         conn.close()
 
-    return n_ok, sorted(nao_enc), erros
+    return n_ok, sorted(nao_enc), erros, log
 
 
 def deletar_loja(loja_id):

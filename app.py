@@ -591,12 +591,20 @@ elif pagina == "🏬 Lojas":
                                             index=next((i for i, c in enumerate(colunas) if "rede" in c.lower()), min(2, len(colunas)-1)))
 
                 if st.button("📥 Importar lojas", type="primary", use_container_width=True):
-                    n_ok, nao_enc, erros = banco.importar_lojas_planilha(df_raw, col_nome, col_uf, col_rede)
-                    st.success(f"{n_ok} lojas importadas / atualizadas.")
+                    n_ok, nao_enc, erros, log_imp = banco.importar_lojas_planilha(df_raw, col_nome, col_uf, col_rede)
+                    n_atu = sum(1 for l in log_imp if l["status"] == "atualizado")
+                    n_ins = sum(1 for l in log_imp if l["status"] == "inserido")
+                    st.success(f"✅ {n_ok} processadas — {n_atu} atualizadas, {n_ins} inseridas como novas.")
                     if nao_enc:
-                        st.warning(f"Redes não encontradas no sistema: {', '.join(nao_enc)}")
+                        st.warning(f"⚠️ Redes não encontradas no sistema: {', '.join(nao_enc)}")
                     if erros:
                         st.error(f"{len(erros)} erros: {erros[:3]}")
+                    nao_match = [l for l in log_imp if l["status"] == "inserido"]
+                    if nao_match:
+                        with st.expander(f"⚠️ {len(nao_match)} loja(s) inseridas como novas — nome pode ser diferente do faturamento"):
+                            st.caption("Esses nomes da planilha não bateram com nenhum registro do banco. Se a loja já existe, o nome está diferente.")
+                            for l in nao_match[:30]:
+                                st.markdown(f"- **{l['nome']}** → rede: {l.get('rede_sistema','?')}")
                     st.rerun()
             except Exception as e:
                 st.error(f"Erro ao ler planilha: {e}")
