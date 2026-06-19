@@ -622,15 +622,17 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                         uf = estados_rede[0]
 
                 try:
+                    # Matching case-insensitive (evita duplicatas por diferenca de maiusculas)
                     cur.execute(
-                        "SELECT id, estado FROM lojas WHERE nome_faturamento=%s", (nome,)
+                        "SELECT id, nome_faturamento, estado FROM lojas WHERE LOWER(nome_faturamento)=LOWER(%s)",
+                        (nome,)
                     )
                     existing = cur.fetchone()
                     if existing:
-                        old_estado = existing[1] or ""
+                        old_estado = existing[2] or ""
                         cur.execute(
-                            "UPDATE lojas SET rede_id=%s, estado=%s WHERE id=%s",
-                            (rede["id"], uf if uf else old_estado, existing[0])
+                            "UPDATE lojas SET rede_id=%s, estado=%s, nome_faturamento=%s WHERE id=%s",
+                            (rede["id"], uf if uf else old_estado, nome, existing[0])
                         )
                     else:
                         cur.execute(
