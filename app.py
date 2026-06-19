@@ -621,7 +621,13 @@ elif pagina == "🏬 Lojas":
     sem_rede = [l for l in lojas_all if not l.get("rede_nome")]
 
     if sem_uf:
-        st.warning(f"⚠️ {len(sem_uf)} loja(s) com UF não identificada — corrija manualmente abaixo.")
+        col_warn, col_fix = st.columns([4, 1])
+        col_warn.warning(f"⚠️ {len(sem_uf)} loja(s) com UF não identificada.")
+        if col_fix.button("🔧 Corrigir UFs automaticamente", use_container_width=True, key="fix_ufs"):
+            n1 = banco.corrigir_estados_lojas()
+            n2 = banco.corrigir_uf_por_rede()
+            st.success(f"UFs corrigidas: {n1 + n2} lojas atualizadas.")
+            st.rerun()
     if sem_rede:
         st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
 
