@@ -567,6 +567,17 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                 if uf in ("nan", "None"):
                     uf = ""
 
+                # Se UF ainda vazia, tenta derivar do nome da rede (ex: "Assai BA" → "BA")
+                if not uf:
+                    partes = rede["nome"].strip().split()
+                    if partes and len(partes[-1]) == 2 and partes[-1].isupper():
+                        uf = partes[-1]
+                # Se ainda vazia, usa estado da rede quando ela tem só um estado configurado
+                if not uf:
+                    estados_rede = [e.strip() for e in (rede.get("estados") or "").split(",") if e.strip()]
+                    if len(estados_rede) == 1:
+                        uf = estados_rede[0]
+
                 try:
                     cur.execute(
                         "SELECT id, estado FROM lojas WHERE nome_faturamento=%s", (nome,)
