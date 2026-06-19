@@ -62,11 +62,11 @@ st.markdown("""
 
 
 # ── COOKIE MANAGER ───────────────────────────────────────────────────────────
-@st.cache_resource
-def _get_cookie_manager():
-    return stx.CookieManager(key="dr_cm") if _COOKIES_OK else None
-
-_cm = _get_cookie_manager() if _COOKIES_OK else None
+# Instanciado diretamente (widget — não pode ficar em @cache_resource)
+try:
+    _cm = stx.CookieManager(key="dr_cm") if _COOKIES_OK else None
+except Exception:
+    _cm = None
 
 def _cookie_get(name):
     try:
