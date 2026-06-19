@@ -71,7 +71,7 @@ MAPA_ESTADO = {
     "cidade baixa": "BA", "nazare": "BA", "nazaré": "BA",
     "ribeira": "BA", "barbalho": "BA", "largo do tanque": "BA",
     # ── SE ───────────────────────────────────────────────────────────────────
-    "aracaju": "SE",
+    "aracaju": "SE", "nossa senhora do socorro": "SE", "socorro": "SE",
 }
 
 
