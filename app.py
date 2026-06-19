@@ -115,7 +115,7 @@ with st.sidebar:
     if _is_admin:
         opcoes_nav = [
             "🗂️ Gerar Relatório", "🏭 Fábricas", "🏪 Redes / Clientes",
-            "📦 Produtos", "🔢 Códigos da Rede", "💰 Tabela de Preço",
+            "🏬 Lojas", "📦 Produtos", "🔢 Códigos da Rede", "💰 Tabela de Preço",
             "📥 Importar Faturamento", "👥 Usuários",
         ]
     else:
@@ -470,6 +470,149 @@ elif pagina == "🏪 Redes / Clientes":
                     st.rerun()
                 else:
                     st.warning("Preencha o código.")
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PÁGINA: LOJAS
+# ══════════════════════════════════════════════════════════════════════════════
+elif pagina == "🏬 Lojas":
+    import io as _io
+
+    _c1, _c2 = st.columns([5, 1])
+    with _c1:
+        st.title("Lojas")
+    with _c2:
+        if st.button("🔄 Atualizar", key="ref_lojas"):
+            st.rerun()
+    st.caption("Cadastre as lojas de cada rede. Após importar, o faturamento reconhece as lojas automaticamente sem precisar reimportar o arquivo.")
+
+    redes_all = banco.listar_redes()
+
+    # ── Importar planilha ────────────────────────────────────────────────────
+    with st.expander("📥 Importar lojas de uma planilha (todas as redes)", expanded=True):
+        st.markdown(
+            "A planilha deve ter **3 colunas**: nome da loja (exatamente como aparece no faturamento), "
+            "UF e nome da rede (igual ao cadastrado no sistema)."
+        )
+
+        template_df = pd.DataFrame({
+            "Nome da Loja": ["Sendas Federação (Av. Vasco da Gama) (256)", "Sendas Madalena LJ 284"],
+            "UF":           ["BA", "PE"],
+            "Rede":         ["Assai BA", "Assai PE"],
+        })
+        buf_tpl = _io.BytesIO()
+        template_df.to_excel(buf_tpl, index=False)
+        st.download_button(
+            "⬇️ Baixar modelo de planilha",
+            data=buf_tpl.getvalue(),
+            file_name="modelo_lojas.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        )
+
+        arq_lojas = st.file_uploader("Arquivo (.xlsx ou .xls)", type=["xlsx", "xls"], key="up_lojas")
+
+        if arq_lojas:
+            try:
+                df_raw = pd.read_excel(_io.BytesIO(arq_lojas.getvalue()))
+                st.dataframe(df_raw.head(5), use_container_width=True, hide_index=True)
+
+                colunas = list(df_raw.columns)
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    col_nome = st.selectbox("Coluna: Nome da Loja", colunas,
+                                            index=next((i for i, c in enumerate(colunas) if "nome" in c.lower() or "loja" in c.lower()), 0))
+                with c2:
+                    col_uf   = st.selectbox("Coluna: UF", colunas,
+                                            index=next((i for i, c in enumerate(colunas) if "uf" in c.lower() or "estado" in c.lower()), min(1, len(colunas)-1)))
+                with c3:
+                    col_rede = st.selectbox("Coluna: Rede", colunas,
+                                            index=next((i for i, c in enumerate(colunas) if "rede" in c.lower()), min(2, len(colunas)-1)))
+
+                if st.button("📥 Importar lojas", type="primary", use_container_width=True):
+                    n_ok, nao_enc, erros = banco.importar_lojas_planilha(df_raw, col_nome, col_uf, col_rede)
+                    st.success(f"{n_ok} lojas importadas / atualizadas.")
+                    if nao_enc:
+                        st.warning(f"Redes não encontradas no sistema: {', '.join(nao_enc)}")
+                    if erros:
+                        st.error(f"{len(erros)} erros: {erros[:3]}")
+                    st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao ler planilha: {e}")
+
+    st.markdown("---")
+
+    # ── Listagem ─────────────────────────────────────────────────────────────
+    col_filt, col_info = st.columns([3, 1])
+    with col_filt:
+        rede_filtro = st.selectbox(
+            "Filtrar por rede",
+            ["Todas as redes"] + [r["nome"] for r in redes_all],
+            key="lojas_filt_rede",
+        )
+    rede_filt_obj = next((r for r in redes_all if r["nome"] == rede_filtro), None)
+    lojas_all = banco.listar_lojas_com_rede(rede_id=rede_filt_obj["id"] if rede_filt_obj else None)
+
+    with col_info:
+        st.metric("Total de lojas", len(lojas_all))
+
+    sem_uf   = [l for l in lojas_all if not l.get("estado")]
+    sem_rede = [l for l in lojas_all if not l.get("rede_nome")]
+
+    if sem_uf:
+        st.warning(f"⚠️ {len(sem_uf)} loja(s) com UF não identificada — corrija manualmente abaixo.")
+    if sem_rede:
+        st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
+
+    if lojas_all:
+        header = st.columns([4, 1, 2, 1])
+        header[0].markdown("**Nome da loja**")
+        header[1].markdown("**UF**")
+        header[2].markdown("**Rede**")
+        header[3].markdown("")
+        st.markdown('<hr style="margin:4px 0">', unsafe_allow_html=True)
+
+        for loja in lojas_all:
+            c1, c2, c3, c4 = st.columns([4, 1, 2, 1])
+            uf_label = loja.get("estado") or "?"
+            uf_color = "#1565c0" if loja.get("estado") else "#e65100"
+            c1.markdown(f'<span style="font-size:13px">{loja["nome_faturamento"]}</span>', unsafe_allow_html=True)
+            c2.markdown(
+                f'<span style="background:{"#e3f2fd" if loja.get("estado") else "#fff3e0"};'
+                f'color:{uf_color};padding:2px 8px;border-radius:6px;font-size:12px">{uf_label}</span>',
+                unsafe_allow_html=True,
+            )
+            c3.markdown(f'<span style="font-size:13px;color:#555">{loja.get("rede_nome") or "—"}</span>', unsafe_allow_html=True)
+            if c4.button("🗑️", key=f"del_loja_{loja['id']}", help="Remover loja"):
+                banco.deletar_loja(loja["id"])
+                st.rerun()
+    else:
+        st.info("Nenhuma loja cadastrada ainda.")
+
+    st.markdown("---")
+
+    # ── Adicionar manualmente ─────────────────────────────────────────────────
+    with st.expander("➕ Adicionar loja manualmente"):
+        ufs_br = ["AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
+                  "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
+        ma1, ma2, ma3, ma4 = st.columns([4, 1, 2, 1])
+        with ma1:
+            nome_man = st.text_input("Nome exato da loja (como aparece no faturamento)", key="man_nome")
+        with ma2:
+            uf_man   = st.selectbox("UF", ufs_br, key="man_uf")
+        with ma3:
+            rede_man = st.selectbox("Rede", [r["nome"] for r in redes_all], key="man_rede")
+        with ma4:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("Adicionar", key="man_add", use_container_width=True):
+                if nome_man.strip():
+                    rede_man_obj = next((r for r in redes_all if r["nome"] == rede_man), None)
+                    if rede_man_obj:
+                        banco.salvar_loja_manual(rede_man_obj["id"], nome_man.strip(), uf_man)
+                        st.success("Loja adicionada!")
+                        st.rerun()
+                else:
+                    st.warning("Informe o nome da loja.")
 
 
 # ══════════════════════════════════════════════════════════════════════════════

@@ -494,6 +494,112 @@ def obter_ou_criar_loja(rede_id, nome_faturamento, estado=""):
         conn.close()
 
 
+
+
+def listar_lojas_com_rede(rede_id=None):
+    """Retorna lojas com nome da rede, opcionalmente filtrado por rede_id."""
+    if rede_id:
+        rows = _fetch("""
+            SELECT l.*, r.nome as rede_nome
+            FROM lojas l
+            LEFT JOIN redes r ON r.id = l.rede_id
+            WHERE l.rede_id=%s
+            ORDER BY l.estado, l.nome_faturamento
+        """, (rede_id,))
+    else:
+        rows = _fetch("""
+            SELECT l.*, r.nome as rede_nome
+            FROM lojas l
+            LEFT JOIN redes r ON r.id = l.rede_id
+            ORDER BY r.nome, l.estado, l.nome_faturamento
+        """)
+    return [dict(r) for r in rows]
+
+
+def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
+    """
+    Importa lojas de um DataFrame com colunas Nome, UF e Rede.
+    Faz UPSERT: se a loja ja existe, atualiza rede_id e estado.
+    Retorna (n_ok, redes_nao_encontradas, erros).
+    """
+    redes = listar_redes()
+    redes_map = {r["nome"].strip().lower(): r for r in redes}
+
+    def _match_rede(nome_planilha):
+        n = nome_planilha.strip().lower()
+        if n in redes_map:
+            return redes_map[n]
+        for k, v in redes_map.items():
+            if n in k or k in n:
+                return v
+        return None
+
+    n_ok = 0
+    nao_enc = set()
+    erros = []
+
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            for _, row in df.iterrows():
+                nome  = str(row.get(col_nome, "") or "").strip()
+                uf    = str(row.get(col_uf,   "") or "").strip().upper()
+                r_nom = str(row.get(col_rede,  "") or "").strip()
+
+                if not nome or nome in ("nan", "None", ""):
+                    continue
+
+                rede = _match_rede(r_nom)
+                if not rede:
+                    if r_nom and r_nom not in ("nan", "None"):
+                        nao_enc.add(r_nom)
+                    continue
+
+                if uf in ("nan", "None"):
+                    uf = ""
+
+                try:
+                    cur.execute("""
+                        INSERT INTO lojas (rede_id, nome_faturamento, estado)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (nome_faturamento) DO UPDATE SET
+                            rede_id = EXCLUDED.rede_id,
+                            estado  = CASE WHEN EXCLUDED.estado != '' THEN EXCLUDED.estado
+                                          ELSE lojas.estado END
+                    """, (rede["id"], nome, uf))
+                    n_ok += 1
+                except Exception as e:
+                    erros.append(str(e))
+        conn.commit()
+    finally:
+        conn.close()
+
+    return n_ok, sorted(nao_enc), erros
+
+
+def deletar_loja(loja_id):
+    """Remove uma loja (e seus registros de faturamento vinculados)."""
+    conn = conectar()
+    conn.autocommit = True
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM faturamento WHERE loja_id=%s", (loja_id,))
+            cur.execute("DELETE FROM lojas WHERE id=%s", (loja_id,))
+    finally:
+        conn.close()
+
+
+def salvar_loja_manual(rede_id, nome_faturamento, uf):
+    """Cria ou atualiza uma loja manualmente."""
+    _run("""
+        INSERT INTO lojas (rede_id, nome_faturamento, estado)
+        VALUES (%s, %s, %s)
+        ON CONFLICT (nome_faturamento) DO UPDATE SET
+            rede_id = EXCLUDED.rede_id,
+            estado  = EXCLUDED.estado
+    """, (rede_id, nome_faturamento, uf))
+
+
 # ── FATURAMENTO ───────────────────────────────────────────────────────────────
 
 def gravar_faturamento(registros):
