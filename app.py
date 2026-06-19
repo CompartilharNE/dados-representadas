@@ -646,10 +646,92 @@ elif pagina == "🔢 Códigos da Rede":
             st.rerun()
     st.caption("Mapeamento entre o código da fábrica e o código que cada rede usa internamente.")
 
+    import unicodedata as _ud
+
+    def _norm(t):
+        return _ud.normalize("NFD", str(t).lower()).encode("ascii","ignore").decode("ascii").strip()
+
     fabricas = banco.listar_fabricas()
     redes    = banco.listar_redes()
     nomes_fab  = [f["nome"] for f in fabricas]
     nomes_rede = [r["nome"] for r in redes]
+
+    # ── Importar todas as fábricas de uma vez ─────────────────────────────────
+    with st.expander("📥 Importar códigos de múltiplas fábricas de uma vez", expanded=False):
+        st.caption("Envie uma planilha com colunas: Fábrica · Cód. Fábrica · Cód. Rede — uma linha por produto.")
+        import io as _io_m
+
+        rede_multi_sel = st.selectbox("Rede / Cliente", nomes_rede, key="multi_rede")
+        rede_multi = next((r for r in redes if r["nome"] == rede_multi_sel), None)
+
+        arq_multi = st.file_uploader("Planilha (.xlsx)", type=["xlsx","xls"], key="upload_multi")
+        if arq_multi is not None:
+            _b = arq_multi.read()
+            if _b:
+                st.session_state["_cache_multi"] = (arq_multi.name, _b)
+
+        _multi_cache = st.session_state.get("_cache_multi")
+        if _multi_cache and rede_multi:
+            _mn, _mb = _multi_cache
+            try:
+                df_m = pd.read_excel(_io_m.BytesIO(_mb), dtype=str)
+                df_m.columns = [str(c).strip() for c in df_m.columns]
+                df_m = df_m.dropna(how="all")
+                cols_m = ["(ignorar)"] + list(df_m.columns)
+
+                def _sg(kws):
+                    for c in df_m.columns:
+                        if any(k in c.lower() for k in kws): return c
+                    return "(ignorar)"
+
+                st.dataframe(df_m.head(4), use_container_width=True, hide_index=True)
+                mc1, mc2, mc3 = st.columns(3)
+                col_mfab  = mc1.selectbox("Coluna — Fábrica *",      cols_m, index=cols_m.index(_sg(["fabrica","fábrica","fab","fornec"])), key="m_fab")
+                col_mcfab = mc2.selectbox("Coluna — Cód. Fábrica *", cols_m, index=cols_m.index(_sg(["cod fab","cód fab","codigo fab","código fab","cod. fab"])), key="m_cfab")
+                col_mcred = mc3.selectbox("Coluna — Cód. Rede *",    cols_m, index=cols_m.index(_sg(["cod rede","cód rede","codigo rede","código rede","cod. rede","rede","cliente"])), key="m_cred")
+
+                if col_mfab != "(ignorar)" and col_mcfab != "(ignorar)" and col_mcred != "(ignorar)":
+                    df_m2 = df_m[[col_mfab, col_mcfab, col_mcred]].copy()
+                    df_m2.columns = ["fabrica_nome","codigo_fab","codigo_rede"]
+                    df_m2 = df_m2.dropna(subset=["codigo_fab","codigo_rede"])
+                    df_m2 = df_m2[~df_m2["codigo_fab"].isin(["nan","None",""])]
+                    df_m2 = df_m2[~df_m2["codigo_rede"].isin(["nan","None",""])]
+
+                    def _match_fab(nome_planilha):
+                        n = _norm(nome_planilha)
+                        for f in fabricas:
+                            if _norm(f["nome"]) in n or n in _norm(f["nome"]):
+                                return f
+                            if _norm(f["nome_faturamento"]) in n or n in _norm(f["nome_faturamento"]):
+                                return f
+                        return None
+
+                    df_m2["fab_obj"] = df_m2["fabrica_nome"].apply(_match_fab)
+                    nao_rec = df_m2[df_m2["fab_obj"].isna()]["fabrica_nome"].unique().tolist()
+                    df_ok   = df_m2[df_m2["fab_obj"].notna()]
+
+                    resumo = df_ok.groupby("fabrica_nome").size().reset_index(name="qtd")
+                    st.markdown(f"**{len(df_ok)} pares válidos** encontrados:")
+                    st.dataframe(resumo.rename(columns={"fabrica_nome":"Fábrica","qtd":"Qtd"}),
+                                 use_container_width=True, hide_index=True)
+                    if nao_rec:
+                        st.warning(f"Fábricas não reconhecidas: {', '.join(nao_rec)} — verifique o nome exato cadastrado.")
+
+                    if len(df_ok) > 0 and st.button("✅ Importar todas as fábricas", use_container_width=True, type="primary", key="btn_multi"):
+                        total_ok = total_nao = 0
+                        for fab_obj, grupo in df_ok.groupby("fab_obj"):
+                            df_par = grupo[["codigo_fab","codigo_rede"]].copy()
+                            n_imp, nao_enc = banco.importar_codigos_rede_df(fab_obj["id"], rede_multi["id"], df_par)
+                            total_ok  += n_imp
+                            total_nao += len(nao_enc)
+                        st.success(f"✅ {total_ok} códigos importados.")
+                        if total_nao:
+                            st.warning(f"{total_nao} produto(s) não encontrados no catálogo — importe o catálogo primeiro.")
+                        st.rerun()
+            except Exception as _e:
+                st.error(f"Erro: {_e}")
+
+    st.markdown("---")
 
     col1, col2 = st.columns(2)
     with col1:
