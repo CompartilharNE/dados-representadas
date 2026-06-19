@@ -497,6 +497,49 @@ def obter_ou_criar_loja(rede_id, nome_faturamento, estado=""):
 
 
 
+
+def corrigir_uf_por_rede():
+    """
+    Para lojas com UF vazia, deriva pelo nome/estados da rede associada.
+    Regra 1: ultimas 2 letras maiusculas do nome da rede (ex: 'Assai BA' -> 'BA').
+    Regra 2: se a rede tiver exatamente 1 estado configurado, usa esse estado.
+    Retorna numero de lojas atualizadas.
+    """
+    import psycopg2.extras as _ext
+    conn = conectar()
+    atualizados = 0
+    try:
+        with conn.cursor(cursor_factory=_ext.RealDictCursor) as cur:
+            cur.execute("""
+                SELECT l.id, r.nome as rede_nome, r.estados
+                FROM lojas l
+                LEFT JOIN redes r ON r.id = l.rede_id
+                WHERE (l.estado = '' OR l.estado IS NULL)
+                  AND l.rede_id IS NOT NULL
+            """)
+            lojas = cur.fetchall()
+            for loja in lojas:
+                uf = ""
+                rede_nome = loja["rede_nome"] or ""
+                estados   = loja["estados"]   or ""
+                # Regra 1: ultimas 2 letras do nome da rede
+                partes = rede_nome.strip().split()
+                if partes and len(partes[-1]) == 2 and partes[-1].isupper():
+                    uf = partes[-1]
+                # Regra 2: rede com estado unico
+                if not uf:
+                    lista = [e.strip() for e in estados.split(",") if e.strip()]
+                    if len(lista) == 1:
+                        uf = lista[0]
+                if uf:
+                    cur.execute("UPDATE lojas SET estado=%s WHERE id=%s", (uf, loja["id"]))
+                    atualizados += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return atualizados
+
+
 def listar_lojas_com_rede(rede_id=None):
     """Retorna lojas com nome da rede, opcionalmente filtrado por rede_id."""
     if rede_id:
