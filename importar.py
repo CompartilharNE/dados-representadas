@@ -17,18 +17,42 @@ def _sem_acento(texto):
 
 # ── MAPEAMENTO ESTADO POR KEYWORD DE LOJA ────────────────────────────────────
 MAPA_ESTADO = {
+    # ── Cidades/regiões PE ────────────────────────────────────────────────────
     "arruda": "PE", "camaragibe": "PE", "caruaru": "PE", "casa amarela": "PE",
     "garanhuns": "PE", "igarassu": "PE", "iputinga": "PE", "jaboatão": "PE",
     "jaboatao": "PE", "olinda": "PE", "palmares": "PE", "paulista": "PE",
     "petrolina": "PE", "recife": "PE", "santa cruz do capibaribe": "PE",
     "serra talhada": "PE", "são lourenço da mata": "PE", "sao lourenco da mata": "PE",
     "vitória de santo antão": "PE", "vitoria de santo antao": "PE",
-    "belo jardim": "PE", "campina grande": "PB", "joão pessoa": "PB",
-    "joao pessoa": "PB", "patos": "PB", "santa rita": "PB",
+    "belo jardim": "PE", "candeias": "PE",
+    # Bairros de Recife/Grande Recife — PE
+    "madalena": "PE", "boa viagem": "PE", "imbiribeira": "PE",
+    "peixinhos": "PE", "cabo de santo agostinho": "PE", "caxanga": "PE",
+    "caxangá": "PE", "cordeiro": "PE", "encruzilhada": "PE",
+    "hipódromo": "PE", "hipodromo": "PE", "torre": "PE",
+    "apipucos": "PE", "dois irmaos": "PE", "dois irmãos": "PE",
+    "vasco da gama": "PE",
+    # ── Cidades/regiões PB ────────────────────────────────────────────────────
+    "campina grande": "PB", "joão pessoa": "PB", "joao pessoa": "PB",
+    "patos": "PB", "santa rita": "PB", "cabedelo": "PB",
+    # ── Cidades/regiões RN ────────────────────────────────────────────────────
     "caicó": "RN", "caico": "RN", "mossoró": "RN", "mossoro": "RN",
-    "natal": "RN", "parnamirim": "RN", "arapiraca": "AL", "maceió": "AL",
-    "maceio": "AL", "alagoinhas": "BA", "barreiras": "BA", "brotas": "BA",
-    "candeias": "PE", "cabula": "BA", "camaçari": "BA", "camacari": "BA",
+    "natal": "RN", "parnamirim": "RN",
+    # Bairros de Natal — RN
+    "capim macio": "RN", "capim mácio": "RN", "candelaria": "RN",
+    "candelária": "RN", "ponta negra": "RN", "lagoa nova": "RN",
+    "tirol": "RN", "neópolis": "RN", "neopolis": "RN",
+    "sao goncalo": "RN", "são gonçalo": "RN",
+    # ── Cidades/regiões AL ────────────────────────────────────────────────────
+    "arapiraca": "AL", "maceió": "AL", "maceio": "AL",
+    # Bairros de Maceió — AL
+    "mangabeiras": "AL", "gruta de lourdes": "AL", "jardim sao paulo": "AL",
+    "jardim são paulo": "AL", "pajuçara": "AL", "pajucara": "AL",
+    "jatiuca": "AL", "jatiúca": "AL", "ponta verde": "AL",
+    "farol": "AL",
+    # ── Cidades/regiões BA ────────────────────────────────────────────────────
+    "alagoinhas": "BA", "barreiras": "BA",
+    "cabula": "BA", "camaçari": "BA", "camacari": "BA",
     "cosme de farias": "BA", "eunápolis": "BA", "eunapolis": "BA",
     "feira de santana": "BA", "feira morada": "BA", "ilhéus": "BA",
     "ilheus": "BA", "irecê": "BA", "irece": "BA", "itapuã": "BA",
@@ -37,12 +61,17 @@ MAPA_ESTADO = {
     "santo antônio de jesus": "BA", "santo antonio de jesus": "BA",
     "simões filho": "BA", "simoes filho": "BA", "teixeira de freitas": "BA",
     "valença": "BA", "valenca": "BA", "vitória da conquista": "BA",
-    "vitoria da conquista": "BA", "aracaju": "SE",
-    # Bairros/locais de Salvador-BA
+    "vitoria da conquista": "BA",
+    # Bairros de Salvador — BA
     "barra": "BA", "garibaldi": "BA", "canela": "BA", "iguatemi": "BA",
-    "acm": "BA", "boca do rio": "BA", "imbuí": "BA", "imbui": "BA",
-    "ondina": "BA", "liberdade": "BA", "engenho velho": "BA",
+    "acm": "BA", "brotas": "BA", "boca do rio": "BA", "imbuí": "BA",
+    "imbui": "BA", "ondina": "BA", "liberdade": "BA", "engenho velho": "BA",
     "paralela": "BA", "aeroclube": "BA", "pernambués": "BA", "pernambuces": "BA",
+    "federacao": "BA", "federação": "BA", "uruguai": "BA",
+    "cidade baixa": "BA", "nazare": "BA", "nazaré": "BA",
+    "ribeira": "BA", "barbalho": "BA", "largo do tanque": "BA",
+    # ── SE ───────────────────────────────────────────────────────────────────
+    "aracaju": "SE",
 }
 
 
@@ -138,8 +167,11 @@ def _detectar_rede(nome_cliente, redes):
             continue
         # Verificar estados
         estados_rede = [e.strip() for e in (rede["estados"] or "").split(",") if e.strip()]
-        if estados_rede and estado and estado not in estados_rede:
-            continue
+        if estados_rede:
+            # Se o estado da loja não foi detectado E a rede exige estado → não casar
+            # (evita que lojas com bairro desconhecido caiam em todas as redes)
+            if not estado or estado not in estados_rede:
+                continue
         return rede, estado
     return None, estado
 
