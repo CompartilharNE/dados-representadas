@@ -129,8 +129,8 @@ def _detectar_rede(nome_cliente, redes):
     nc = _sem_acento(nome_cliente)
     estado = _estado_por_nome(nome_cliente)
     for rede in redes:
-        filtro = _sem_acento(rede["filtro_nome"])
-        if filtro not in nc:
+        filtros = [_sem_acento(f.strip()) for f in rede["filtro_nome"].split(",") if f.strip()]
+        if not any(f in nc for f in filtros):
             continue
         # Verificar exclusões
         excluir = [_sem_acento(e.strip()) for e in (rede["excluir_palavras"] or "").split(",") if e.strip()]

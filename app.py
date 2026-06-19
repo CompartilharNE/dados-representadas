@@ -380,7 +380,7 @@ elif pagina == "🏪 Redes / Clientes":
                                        value=r_edit["excluir_palavras"] if r_edit else "")
 
         # ── Logo da rede ──────────────────────────────────────────────────────
-        st.markdown("**Logo da rede** *(aparecerá na planilha ao lado da logo Compartilhar)*")
+        st.markdown("**Logo da rede** *(aparecerá na planilha ao lado da logo da Fábrica)*")
         logo_col1, logo_col2 = st.columns([2, 3])
         with logo_col1:
             logo_atual = r_edit.get("logo_b64", "") if r_edit else ""
