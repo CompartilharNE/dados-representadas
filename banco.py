@@ -813,6 +813,26 @@ def limpar_lojas_duplicadas():
     return removidos
 
 
+
+def remover_prefixo_cliente():
+    """Remove o prefixo 'Cliente: ' (case-insensitive) do nome_faturamento de todas as lojas.
+    Retorna número de lojas atualizadas.
+    """
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE lojas
+                SET nome_faturamento = TRIM(SUBSTRING(nome_faturamento FROM 9))
+                WHERE nome_faturamento ILIKE 'Cliente: %'
+            """)
+            n = cur.rowcount
+        conn.commit()
+    finally:
+        conn.close()
+    return n
+
+
 # ── FATURAMENTO ───────────────────────────────────────────────────────────────
 
 def gravar_faturamento(registros):

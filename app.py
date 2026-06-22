@@ -639,14 +639,24 @@ elif pagina == "🏬 Lojas":
     if sem_rede:
         st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
 
-    # Botão para limpar duplicatas
-    if st.button("🧹 Limpar lojas duplicadas", key="limpar_dup"):
-        n_dup = banco.limpar_lojas_duplicadas()
-        if n_dup:
-            st.success(f"✅ {n_dup} loja(s) duplicada(s) removida(s).")
-            st.rerun()
-        else:
-            st.info("Nenhuma duplicata encontrada.")
+    # Botões de manutenção
+    col_b1, col_b2 = st.columns(2)
+    with col_b1:
+        if st.button("🧹 Limpar lojas duplicadas", key="limpar_dup"):
+            n_dup = banco.limpar_lojas_duplicadas()
+            if n_dup:
+                st.success(f"✅ {n_dup} loja(s) duplicada(s) removida(s).")
+                st.rerun()
+            else:
+                st.info("Nenhuma duplicata encontrada.")
+    with col_b2:
+        if st.button("✏️ Remover prefixo 'Cliente:'", key="remover_cliente"):
+            n_cli = banco.remover_prefixo_cliente()
+            if n_cli:
+                st.success(f"✅ Prefixo removido de {n_cli} loja(s).")
+                st.rerun()
+            else:
+                st.info("Nenhuma loja com prefixo 'Cliente:' encontrada.")
 
     ufs_br = ["","AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
               "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
