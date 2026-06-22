@@ -264,12 +264,15 @@ def criar_banco():
         pass  # seguro: só atualiza registros existentes
 
     # Correções pontuais de lojas mal-classificadas
-    try:
-        corrigir_loja_rede_por_nome(
-            "Sendas Federação (Av. Vasco da Gama) (256)", "Assai BA", "BA"
-        )
-    except Exception:
-        pass
+    _correcoes_lojas = [
+        ("Sendas Federação (Av. Vasco da Gama) (256)", "Assai BA", "BA"),
+        ("Sendas Itabaiana (147) SUSPENSA",             "Assai BA", "BA"),
+    ]
+    for _nome, _rede, _uf in _correcoes_lojas:
+        try:
+            corrigir_loja_rede_por_nome(_nome, _rede, _uf)
+        except Exception:
+            pass
 
 
 # ── FABRICAS ──────────────────────────────────────────────────────────────────

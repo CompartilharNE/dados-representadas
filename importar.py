@@ -234,8 +234,15 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
     banco.limpar_faturamento_arquivo(nome_arquivo)
 
     registros = []
-    cache_lojas = {}  # nome_cliente -> loja_id
+    cache_lojas = {}   # nome_cliente -> loja_id
+    cache_rede  = {}   # nome_cliente -> rede dict (para evitar sem_rede em lojas já cadastradas)
     datas = []
+
+    # Pré-carregar lojas já cadastradas para usar a rede do banco em vez de re-detectar
+    lojas_cadastradas = {}   # LOWER(nome_faturamento) -> {"rede_id": ..., "estado": ...}
+    for lj in banco.listar_lojas():
+        lojas_cadastradas[lj["nome_faturamento"].lower()] = lj
+    redes_por_id = {r["id"]: r for r in redes}
 
     for idx, cells in enumerate(linhas):
         try:
@@ -256,8 +263,13 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
                 stats["sem_fabrica"] += 1
                 continue
 
-            # Rede
-            rede, estado = _detectar_rede(nome_cliente, redes)
+            # Rede — usa a rede já cadastrada para a loja se existir; só detecta pelo nome se for nova
+            if nome_cliente.lower() in lojas_cadastradas:
+                lj_db = lojas_cadastradas[nome_cliente.lower()]
+                rede  = redes_por_id.get(lj_db["rede_id"])
+                estado = lj_db.get("estado") or ""
+            else:
+                rede, estado = _detectar_rede(nome_cliente, redes)
             if not rede:
                 stats["sem_rede"] += 1
                 continue
