@@ -263,6 +263,14 @@ def criar_banco():
     except Exception:
         pass  # seguro: só atualiza registros existentes
 
+    # Correções pontuais de lojas mal-classificadas
+    try:
+        corrigir_loja_rede_por_nome(
+            "Sendas Federação (Av. Vasco da Gama) (256)", "Assai BA", "BA"
+        )
+    except Exception:
+        pass
+
 
 # ── FABRICAS ──────────────────────────────────────────────────────────────────
 
@@ -848,6 +856,30 @@ def remover_prefixo_cliente():
     finally:
         conn.close()
     return n
+
+
+
+def corrigir_loja_rede_por_nome(nome_faturamento, nome_rede, estado):
+    """Corrige rede e estado de uma loja específica pelo nome exato (case-insensitive).
+    Usado para correções pontuais de lojas mal-classificadas.
+    """
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT id FROM redes WHERE LOWER(nome)=LOWER(%s)", (nome_rede,))
+            r = cur.fetchone()
+            if not r:
+                return False, f"Rede '{nome_rede}' não encontrada"
+            rede_id = r[0]
+            cur.execute(
+                "UPDATE lojas SET rede_id=%s, estado=%s WHERE LOWER(nome_faturamento)=LOWER(%s)",
+                (rede_id, estado, nome_faturamento)
+            )
+            n = cur.rowcount
+        conn.commit()
+        return True, n
+    finally:
+        conn.close()
 
 
 # ── FATURAMENTO ───────────────────────────────────────────────────────────────

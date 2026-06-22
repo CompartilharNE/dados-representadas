@@ -31,7 +31,7 @@ MAPA_ESTADO = {
     "caxangá": "PE", "cordeiro": "PE", "encruzilhada": "PE",
     "hipódromo": "PE", "hipodromo": "PE", "torre": "PE",
     "apipucos": "PE", "dois irmaos": "PE", "dois irmãos": "PE",
-    "vasco da gama": "PE",
+    "vasco da gama": "PE", "federacao (av. vasco da gama)": "BA", "federacao vasco da gama": "BA",
     # ── Cidades/regiões PB ────────────────────────────────────────────────────
     "campina grande": "PB", "joão pessoa": "PB", "joao pessoa": "PB",
     "patos": "PB", "santa rita": "PB", "cabedelo": "PB",
@@ -88,7 +88,8 @@ _MAPA_NORM = {_sem_acento(k): v for k, v in MAPA_ESTADO.items()}
 
 def _estado_por_nome(nome):
     n = _sem_acento(nome)
-    for kw, est in _MAPA_NORM.items():
+    # Ordena do mais específico (maior) para o menos específico
+    for kw, est in sorted(_MAPA_NORM.items(), key=lambda x: len(x[0]), reverse=True):
         if kw in n:
             return est
     return ""
