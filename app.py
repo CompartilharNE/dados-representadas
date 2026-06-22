@@ -24,8 +24,17 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Garantir banco criado
-banco.criar_banco()
+# Garantir banco criado (retry em caso de deadlock concorrente)
+import time as _time
+for _tentativa in range(3):
+    try:
+        banco.criar_banco()
+        break
+    except Exception as _e:
+        if "deadlock" in str(_e).lower() and _tentativa < 2:
+            _time.sleep(2)
+        else:
+            raise
 
 # ── ESTILOS ───────────────────────────────────────────────────────────────────
 st.markdown("""

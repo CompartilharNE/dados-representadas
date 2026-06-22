@@ -51,7 +51,22 @@ def _run(sql, params=None, returning=False):
 
 
 def criar_banco():
+    """Inicializa o schema do banco. Usa advisory lock para evitar execução concorrente."""
+    import time as _time
     conn = conectar()
+    try:
+        # Advisory lock (id=12345) garante que só uma instância roda criar_banco por vez
+        with conn.cursor() as cur:
+            cur.execute("SELECT pg_try_advisory_lock(12345)")
+            got_lock = cur.fetchone()[0]
+        if not got_lock:
+            # Outra instância já está rodando — aguarda e retorna
+            _time.sleep(3)
+            conn.close()
+            return
+    except Exception:
+        pass
+
     try:
         with conn.cursor() as cur:
             cur.execute("""
@@ -255,6 +270,12 @@ def criar_banco():
                     )
         conn.commit()
     finally:
+        try:
+            with conn.cursor() as cur:
+                cur.execute("SELECT pg_advisory_unlock(12345)")
+            conn.commit()
+        except Exception:
+            pass
         conn.close()
 
     # Corrige estados vazios de lojas já importadas usando o mapa atual
