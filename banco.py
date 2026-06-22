@@ -265,8 +265,9 @@ def criar_banco():
 
     # Correções pontuais de lojas mal-classificadas
     _correcoes_lojas = [
-        ("Sendas Federação (Av. Vasco da Gama) (256)", "Assai BA", "BA"),
-        ("Sendas Itabaiana (147) SUSPENSA",             "Assai BA", "BA"),
+        ("Sendas Federação (Av. Vasco da Gama) (256)", "Assai BA",    "BA"),
+        ("Sendas Itabaiana (147) SUSPENSA",             "Assai BA",    "BA"),
+        ("Mega Distribuidora (CD Menor Preço)",         "Menor Preço", "PB"),
     ]
     for _nome, _rede, _uf in _correcoes_lojas:
         try:
