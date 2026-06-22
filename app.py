@@ -639,40 +639,46 @@ elif pagina == "🏬 Lojas":
     if sem_rede:
         st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
 
-    # Botões de manutenção
-    col_b1, col_b2 = st.columns(2)
-    with col_b1:
-        if st.button("🧹 Limpar lojas duplicadas", key="limpar_dup"):
-            n_dup = banco.limpar_lojas_duplicadas()
-            if n_dup:
-                st.success(f"✅ {n_dup} loja(s) duplicada(s) removida(s).")
-                st.rerun()
-            else:
-                st.info("Nenhuma duplicata encontrada.")
-    with col_b2:
-        if st.button("✏️ Remover prefixo 'Cliente:'", key="remover_cliente"):
-            n_cli = banco.remover_prefixo_cliente()
-            if n_cli:
-                st.success(f"✅ Prefixo removido de {n_cli} loja(s).")
-                st.rerun()
-            else:
-                st.info("Nenhuma loja com prefixo 'Cliente:' encontrada.")
+    # Botão de manutenção
+    if st.button("🧹 Limpar lojas duplicadas", key="limpar_dup"):
+        n_dup = banco.limpar_lojas_duplicadas()
+        if n_dup:
+            st.success(f"✅ {n_dup} loja(s) duplicada(s) removida(s).")
+            st.rerun()
+        else:
+            st.info("Nenhuma duplicata encontrada.")
 
     ufs_br = ["","AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
               "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
 
     if lojas_all:
-        header = st.columns([4, 1, 2, 1, 1])
-        header[0].markdown("**Nome da loja**")
-        header[1].markdown("**UF**")
-        header[2].markdown("**Rede**")
-        header[3].markdown("")
+        # Seleção em massa
+        selecionadas = st.session_state.get("lojas_selecionadas", set())
+
+        header = st.columns([0.5, 4, 1, 2, 1, 1])
+        sel_todas = header[0].checkbox("", key="sel_todas_lojas",
+                                       value=len(selecionadas) == len(lojas_all) and len(lojas_all) > 0)
+        header[1].markdown("**Nome da loja**")
+        header[2].markdown("**UF**")
+        header[3].markdown("**Rede**")
         header[4].markdown("")
+        header[5].markdown("")
         st.markdown('<hr style="margin:4px 0">', unsafe_allow_html=True)
+
+        if sel_todas:
+            selecionadas = {l["id"] for l in lojas_all}
+        elif st.session_state.get("_prev_sel_todas") and not sel_todas:
+            selecionadas = set()
+        st.session_state["_prev_sel_todas"] = sel_todas
 
         for loja in lojas_all:
             lid = loja["id"]
-            c1, c2, c3, c4, c5 = st.columns([4, 1, 2, 1, 1])
+            c0, c1, c2, c3, c4, c5 = st.columns([0.5, 4, 1, 2, 1, 1])
+            checked = c0.checkbox("", key=f"chk_loja_{lid}", value=lid in selecionadas, label_visibility="collapsed")
+            if checked:
+                selecionadas.add(lid)
+            else:
+                selecionadas.discard(lid)
             uf_label = loja.get("estado") or "?"
             uf_color = "#1565c0" if loja.get("estado") else "#e65100"
             c1.markdown(f'<span style="font-size:13px">{loja["nome_faturamento"]}</span>', unsafe_allow_html=True)
@@ -686,6 +692,8 @@ elif pagina == "🏬 Lojas":
                 st.session_state[f"_edit_loja_{lid}"] = not st.session_state.get(f"_edit_loja_{lid}", False)
             if c5.button("🗑️", key=f"del_loja_{lid}", help="Remover loja"):
                 banco.deletar_loja(lid)
+                selecionadas.discard(lid)
+                st.session_state["lojas_selecionadas"] = selecionadas
                 st.rerun()
 
             # Formulário inline de edição
@@ -708,6 +716,16 @@ elif pagina == "🏬 Lojas":
                     if cancelar_e.form_submit_button("Cancelar", use_container_width=True):
                         del st.session_state[f"_edit_loja_{lid}"]
                         st.rerun()
+
+        st.session_state["lojas_selecionadas"] = selecionadas
+
+        if selecionadas:
+            st.markdown("---")
+            if st.button(f"🗑️ Excluir {len(selecionadas)} loja(s) selecionada(s)", type="primary", key="excluir_sel"):
+                for lid in list(selecionadas):
+                    banco.deletar_loja(lid)
+                st.session_state["lojas_selecionadas"] = set()
+                st.rerun()
     else:
         st.info("Nenhuma loja cadastrada ainda.")
 
