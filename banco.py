@@ -136,6 +136,55 @@ def criar_banco():
                     status TEXT DEFAULT 'ok'
                 )
             """)
+            # Limpar duplicatas em lojas antes de criar o UNIQUE index
+            cur.execute("""
+                DELETE FROM lojas
+                WHERE id IN (
+                    SELECT id FROM (
+                        SELECT id,
+                               ROW_NUMBER() OVER (
+                                   PARTITION BY LOWER(nome_faturamento)
+                                   ORDER BY id
+                               ) AS rn
+                        FROM lojas
+                    ) sub
+                    WHERE rn > 1
+                )
+                  AND id NOT IN (SELECT DISTINCT loja_id FROM faturamento WHERE loja_id IS NOT NULL)
+            """)
+            # Reatribuir faturamento de duplicatas antes de removê-las
+            cur.execute("""
+                UPDATE faturamento f
+                SET loja_id = (
+                    SELECT MIN(l2.id)
+                    FROM lojas l2
+                    WHERE LOWER(l2.nome_faturamento) = LOWER(
+                        (SELECT nome_faturamento FROM lojas WHERE id = f.loja_id)
+                    )
+                )
+                WHERE f.loja_id IN (
+                    SELECT id FROM lojas
+                    WHERE LOWER(nome_faturamento) IN (
+                        SELECT LOWER(nome_faturamento)
+                        FROM lojas
+                        GROUP BY LOWER(nome_faturamento)
+                        HAVING COUNT(*) > 1
+                    )
+                    AND id NOT IN (
+                        SELECT MIN(id)
+                        FROM lojas
+                        GROUP BY LOWER(nome_faturamento)
+                    )
+                )
+            """)
+            cur.execute("""
+                DELETE FROM lojas
+                WHERE id NOT IN (
+                    SELECT MIN(id)
+                    FROM lojas
+                    GROUP BY LOWER(nome_faturamento)
+                )
+            """)
             # Garantir UNIQUE index em lojas.nome_faturamento (necessário para ON CONFLICT)
             cur.execute("""
                 CREATE UNIQUE INDEX IF NOT EXISTS idx_lojas_nome_fat
