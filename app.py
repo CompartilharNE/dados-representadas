@@ -1005,19 +1005,37 @@ elif pagina == "🔢 Códigos da Rede":
                         st.warning(f"Fábricas não reconhecidas: {', '.join(nao_rec)} — verifique o nome exato cadastrado.")
 
                     if len(df_ok) > 0 and st.button("✅ Importar todas as fábricas", use_container_width=True, type="primary", key="btn_multi"):
-                        total_ok = total_nao = 0
+                        resultado_multi = []
                         for fab_id, grupo in df_ok.groupby("fab_id"):
                             fab_obj = next((f for f in fabricas if f["id"] == fab_id), None)
                             if not fab_obj:
                                 continue
                             df_par = grupo[["codigo_fab","codigo_rede"]].copy()
                             n_imp, nao_enc = banco.importar_codigos_rede_df(fab_obj["id"], rede_multi["id"], df_par)
-                            total_ok  += n_imp
-                            total_nao += len(nao_enc)
-                        st.success(f"✅ {total_ok} códigos importados.")
-                        if total_nao:
-                            st.warning(f"{total_nao} produto(s) não encontrados no catálogo — importe o catálogo primeiro.")
-                        st.rerun()
+                            resultado_multi.append({
+                                "fab": fab_obj["nome"],
+                                "ok": n_imp,
+                                "nao_enc": len(nao_enc),
+                                "exemplos": nao_enc[:3],
+                            })
+                        st.session_state["_resultado_multi"] = resultado_multi
+
+                    if st.session_state.get("_resultado_multi"):
+                        res = st.session_state["_resultado_multi"]
+                        total_ok  = sum(r["ok"] for r in res)
+                        total_nao = sum(r["nao_enc"] for r in res)
+                        if total_ok:
+                            st.success(f"✅ {total_ok} código(s) importado(s).")
+                        for r in res:
+                            if r["ok"] == 0 and r["nao_enc"] > 0:
+                                st.error(f"❌ **{r['fab']}**: 0 importados, {r['nao_enc']} não encontrados no catálogo. Exemplos: {r['exemplos']}")
+                            elif r["nao_enc"] > 0:
+                                st.warning(f"⚠️ **{r['fab']}**: {r['ok']} importados, {r['nao_enc']} não encontrados. Exemplos: {r['exemplos']}")
+                            else:
+                                st.info(f"✔️ **{r['fab']}**: {r['ok']} importados.")
+                        if st.button("🔄 Atualizar página", key="btn_multi_reload"):
+                            st.session_state.pop("_resultado_multi", None)
+                            st.rerun()
             except Exception as _e:
                 st.error(f"Erro: {_e}")
 
