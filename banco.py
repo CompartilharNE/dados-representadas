@@ -519,20 +519,37 @@ def listar_lojas(rede_id=None):
 
 
 def obter_ou_criar_loja(rede_id, nome_faturamento, estado=""):
+    """Busca loja pelo nome (case-insensitive). Se existir com rede diferente, atualiza a rede.
+    Usa ON CONFLICT para evitar UniqueViolation em inserções concorrentes.
+    """
     conn = conectar()
     try:
         with conn.cursor() as cur:
+            # Busca apenas pelo nome (UNIQUE é só em nome_faturamento)
             cur.execute(
-                "SELECT id FROM lojas WHERE nome_faturamento=%s AND rede_id=%s",
-                (nome_faturamento, rede_id)
+                "SELECT id, rede_id FROM lojas WHERE LOWER(nome_faturamento)=LOWER(%s)",
+                (nome_faturamento,)
             )
             loja = cur.fetchone()
             if loja:
-                return loja[0]
-            cur.execute(
-                "INSERT INTO lojas (rede_id, nome_faturamento, estado) VALUES (%s, %s, %s) RETURNING id",
-                (rede_id, nome_faturamento, estado)
-            )
+                loja_id, rede_atual = loja
+                # Atualiza rede e estado se a planilha indica rede diferente
+                if rede_atual != rede_id or (estado and estado != ""):
+                    cur.execute(
+                        "UPDATE lojas SET rede_id=%s, estado=COALESCE(NULLIF(%s,''), estado) WHERE id=%s",
+                        (rede_id, estado, loja_id)
+                    )
+                conn.commit()
+                return loja_id
+            # Insere; ON CONFLICT garante que concorrência não quebra
+            cur.execute("""
+                INSERT INTO lojas (rede_id, nome_faturamento, estado)
+                VALUES (%s, %s, %s)
+                ON CONFLICT (nome_faturamento) DO UPDATE
+                    SET rede_id=EXCLUDED.rede_id,
+                        estado=COALESCE(NULLIF(EXCLUDED.estado,''), lojas.estado)
+                RETURNING id
+            """, (rede_id, nome_faturamento, estado))
             loja_id = cur.fetchone()[0]
         conn.commit()
         return loja_id
