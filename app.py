@@ -1471,6 +1471,10 @@ elif pagina == "📥 Importar Faturamento":
                         else:
                             st.warning(f"⚠️ **{label}** — nenhum lançamento gravado. "
                                        f"Sem produto: {stats['sem_produto']}. Verifique os catálogos.")
+                        if stats.get("erros_detalhe"):
+                            with st.expander(f"⚠️ {len(stats['erros_detalhe'])} linha(s) com erro em {label}"):
+                                import pandas as pd
+                                st.dataframe(pd.DataFrame(stats["erros_detalhe"]), use_container_width=True, hide_index=True)
                     except Exception as e:
                         st.error(f"❌ **{label}** — Erro: {e}")
             st.rerun()

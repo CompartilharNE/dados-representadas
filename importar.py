@@ -219,6 +219,7 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
         "sem_rede": 0,
         "sem_produto": 0,
         "erros": 0,
+        "erros_detalhe": [],   # lista de {linha, celulas, motivo}
     }
 
     # Limpar registros anteriores do mesmo arquivo
@@ -283,8 +284,14 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
             if callback_progresso and idx % 500 == 0:
                 callback_progresso(idx, len(linhas))
 
-        except Exception:
+        except Exception as _exc:
+            import traceback as _tb
             stats["erros"] += 1
+            stats["erros_detalhe"].append({
+                "linha":   idx + 1,
+                "cliente": cells[1].strip() if len(cells) > 1 else "?",
+                "motivo":  str(_exc) or type(_exc).__name__,
+            })
             continue
 
     # Gravar em lote
