@@ -639,6 +639,15 @@ elif pagina == "🏬 Lojas":
     if sem_rede:
         st.warning(f"⚠️ {len(sem_rede)} loja(s) sem rede associada.")
 
+    # Botão para limpar duplicatas
+    if st.button("🧹 Limpar lojas duplicadas", key="limpar_dup"):
+        n_dup = banco.limpar_lojas_duplicadas()
+        if n_dup:
+            st.success(f"✅ {n_dup} loja(s) duplicada(s) removida(s).")
+            st.rerun()
+        else:
+            st.info("Nenhuma duplicata encontrada.")
+
     ufs_br = ["","AC","AL","AM","AP","BA","CE","DF","ES","GO","MA","MG","MS","MT",
               "PA","PB","PE","PI","PR","RJ","RN","RO","RR","RS","SC","SE","SP","TO"]
 

@@ -1,13 +1,12 @@
-# v2.1 — lojas feature
 """
 banco.py — Operacoes do banco PostgreSQL (Supabase)
 Compartilhar NE — Dados Representadas
 v2
 """
 import psycopg2
-import bcrypt
 import psycopg2.extras
 import streamlit as st
+import bcrypt
 
 # Parametros fixos do Supabase Transaction Pooler
 _DB_HOST = "aws-1-us-east-1.pooler.supabase.com"
@@ -55,6 +54,16 @@ def criar_banco():
     conn = conectar()
     try:
         with conn.cursor() as cur:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS usuarios (
+                    id SERIAL PRIMARY KEY,
+                    username TEXT NOT NULL UNIQUE,
+                    nome TEXT NOT NULL,
+                    password_hash TEXT NOT NULL,
+                    perfil TEXT NOT NULL DEFAULT 'usuario',
+                    ultimo_acesso TIMESTAMP
+                )
+            """)
             cur.execute("""
                 CREATE TABLE IF NOT EXISTS fabricas (
                     id SERIAL PRIMARY KEY,
@@ -127,10 +136,16 @@ def criar_banco():
                     status TEXT DEFAULT 'ok'
                 )
             """)
+            # Garantir UNIQUE index em lojas.nome_faturamento (necessário para ON CONFLICT)
+            cur.execute("""
+                CREATE UNIQUE INDEX IF NOT EXISTS idx_lojas_nome_fat
+                ON lojas (nome_faturamento)
+            """)
+            # Adicionar coluna logo_b64 à tabela redes (se ainda não existir)
             cur.execute("""
                 ALTER TABLE redes ADD COLUMN IF NOT EXISTS logo_b64 TEXT DEFAULT ''
             """)
-            # Logo da fábrica
+            # Adicionar coluna logo_b64 à tabela fabricas (se ainda não existir)
             cur.execute("""
                 ALTER TABLE fabricas ADD COLUMN IF NOT EXISTS logo_b64 TEXT DEFAULT ''
             """)
@@ -139,7 +154,7 @@ def criar_banco():
                     id SERIAL PRIMARY KEY,
                     fabrica_id INTEGER NOT NULL REFERENCES fabricas(id),
                     rede_id    INTEGER NOT NULL REFERENCES redes(id),
-                    codigo     TEXT NOT NULL DEFAULT \'\',
+                    codigo     TEXT NOT NULL DEFAULT '',
                     UNIQUE(fabrica_id, rede_id)
                 )
             """)
@@ -150,21 +165,11 @@ def criar_banco():
                     fabrica_id INTEGER NOT NULL REFERENCES fabricas(id),
                     produto_id INTEGER REFERENCES produtos(id),
                     codigo_fab TEXT NOT NULL,
-                    descricao TEXT DEFAULT \'\',
-                    unidade TEXT DEFAULT \'\',
+                    descricao TEXT DEFAULT '',
+                    unidade TEXT DEFAULT '',
                     preco NUMERIC(12,4) DEFAULT 0,
                     data_atualizacao TIMESTAMP DEFAULT NOW(),
                     UNIQUE(rede_id, fabrica_id, codigo_fab)
-                )
-            """)
-            cur.execute("""
-                CREATE TABLE IF NOT EXISTS usuarios (
-                    id SERIAL PRIMARY KEY,
-                    username TEXT NOT NULL UNIQUE,
-                    nome TEXT NOT NULL,
-                    password_hash TEXT NOT NULL,
-                    perfil TEXT NOT NULL DEFAULT 'usuario',
-                    ultimo_acesso TIMESTAMP
                 )
             """)
 
@@ -207,20 +212,7 @@ def criar_banco():
     try:
         corrigir_estados_lojas()
     except Exception:
-        pass
-
-
-def corrigir_estados_lojas():
-    """Re-escaneia lojas com estado vazio e atualiza via mapa de importar.py."""
-    import importar as _imp
-    lojas = _fetch("SELECT id, nome_faturamento FROM lojas WHERE estado = '' OR estado IS NULL")
-    atualizados = 0
-    for l in lojas:
-        est = _imp._estado_por_nome(l["nome_faturamento"])
-        if est:
-            _run("UPDATE lojas SET estado=%s WHERE id=%s", (est, l["id"]))
-            atualizados += 1
-    return atualizados
+        pass  # seguro: só atualiza registros existentes
 
 
 # ── FABRICAS ──────────────────────────────────────────────────────────────────
@@ -269,6 +261,7 @@ def salvar_rede(nome, filtro_nome, estados, excluir_palavras="", rede_id=None):
 
 
 def salvar_logo_rede(rede_id, logo_b64):
+    """Salva a logo da rede (base64) no banco."""
     _run("UPDATE redes SET logo_b64=%s WHERE id=%s", (logo_b64, rede_id))
 
 
@@ -278,6 +271,7 @@ def salvar_logo_fabrica(fab_id, logo_b64):
 
 
 def salvar_cod_fornecedor(fabrica_id, rede_id, codigo):
+    """Salva ou atualiza o código de fornecedor de uma fábrica numa rede."""
     _run("""
         INSERT INTO codigos_fornecedor (fabrica_id, rede_id, codigo)
         VALUES (%s, %s, %s)
@@ -287,6 +281,7 @@ def salvar_cod_fornecedor(fabrica_id, rede_id, codigo):
 
 
 def get_cod_fornecedor(fabrica_id, rede_id):
+    """Retorna o código de fornecedor de uma fábrica numa rede, ou ''."""
     row = _fetch(
         "SELECT codigo FROM codigos_fornecedor WHERE fabrica_id=%s AND rede_id=%s",
         (fabrica_id, rede_id), one=True
@@ -295,6 +290,7 @@ def get_cod_fornecedor(fabrica_id, rede_id):
 
 
 def listar_cods_forn_por_rede(rede_id):
+    """Retorna todos os códigos de fornecedor registrados para uma rede."""
     rows = _fetch("""
         SELECT cf.codigo, f.nome as fabrica_nome, cf.fabrica_id
         FROM codigos_fornecedor cf
@@ -495,21 +491,30 @@ def obter_ou_criar_loja(rede_id, nome_faturamento, estado=""):
         conn.close()
 
 
-
+def corrigir_estados_lojas():
+    """Re-escaneia nomes de lojas com estado vazio e atualiza usando o mapa de estados."""
+    import importar as _imp
+    lojas = _fetch("SELECT id, nome_faturamento FROM lojas WHERE estado = '' OR estado IS NULL")
+    atualizados = 0
+    for l in lojas:
+        est = _imp._estado_por_nome(l["nome_faturamento"])
+        if est:
+            _run("UPDATE lojas SET estado=%s WHERE id=%s", (est, l["id"]))
+            atualizados += 1
+    return atualizados
 
 
 def corrigir_uf_por_rede():
     """
-    Para lojas com UF vazia, deriva pelo nome/estados da rede associada.
-    Regra 1: ultimas 2 letras maiusculas do nome da rede (ex: 'Assai BA' -> 'BA').
+    Para lojas com UF vazia, tenta derivar pelo nome/estados da rede associada.
+    Regra 1: últimas 2 letras maiúsculas do nome da rede (ex: 'Assai BA' → 'BA').
     Regra 2: se a rede tiver exatamente 1 estado configurado, usa esse estado.
-    Retorna numero de lojas atualizadas.
+    Retorna número de lojas atualizadas.
     """
-    import psycopg2.extras as _ext
     conn = conectar()
     atualizados = 0
     try:
-        with conn.cursor(cursor_factory=_ext.RealDictCursor) as cur:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
             cur.execute("""
                 SELECT l.id, r.nome as rede_nome, r.estados
                 FROM lojas l
@@ -522,11 +527,11 @@ def corrigir_uf_por_rede():
                 uf = ""
                 rede_nome = loja["rede_nome"] or ""
                 estados   = loja["estados"]   or ""
-                # Regra 1: ultimas 2 letras do nome da rede
+                # Regra 1: últimas 2 letras do nome da rede
                 partes = rede_nome.strip().split()
                 if partes and len(partes[-1]) == 2 and partes[-1].isupper():
                     uf = partes[-1]
-                # Regra 2: rede com estado unico
+                # Regra 2: rede com estado único
                 if not uf:
                     lista = [e.strip() for e in estados.split(",") if e.strip()]
                     if len(lista) == 1:
@@ -560,7 +565,6 @@ def listar_lojas_com_rede(rede_id=None):
     return [dict(r) for r in rows]
 
 
-
 def _norm_str(s):
     """Normaliza string: minúsculas, sem acentos."""
     import unicodedata
@@ -570,10 +574,12 @@ def _norm_str(s):
 def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
     """
     Importa lojas de um DataFrame com colunas Nome, UF e Rede.
-    UPSERT: se a loja ja existe, SUBSTITUI rede_id e estado.
+    UPSERT: se a loja já existe, SUBSTITUI rede_id e estado.
     Retorna (n_ok, redes_nao_encontradas, erros, log_detalhado).
+    log_detalhado = lista de dicts com info de cada linha processada.
     """
     redes = listar_redes()
+    # Mapa sem acento para matching robusto (Assaí = Assai)
     redes_map = {_norm_str(r["nome"]): r for r in redes}
 
     def _match_rede(nome_planilha):
@@ -588,7 +594,7 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
     n_ok = 0
     nao_enc = set()
     erros = []
-    log = []
+    log = []  # diagnóstico linha a linha
 
     conn = conectar()
     try:
@@ -611,16 +617,19 @@ def importar_lojas_planilha(df, col_nome, col_uf, col_rede):
                 if uf in ("nan", "None"):
                     uf = ""
 
+                # Se UF ainda vazia, tenta derivar do nome da rede (ex: "Assai BA" → "BA")
                 if not uf:
                     partes = rede["nome"].strip().split()
                     if partes and len(partes[-1]) == 2 and partes[-1].isupper():
                         uf = partes[-1]
+                # Se ainda vazia, usa estado da rede quando ela tem só um estado configurado
                 if not uf:
                     estados_rede = [e.strip() for e in (rede.get("estados") or "").split(",") if e.strip()]
                     if len(estados_rede) == 1:
                         uf = estados_rede[0]
 
                 try:
+                    # Matching case-insensitive (evita duplicatas por diferença de maiúsculas)
                     cur.execute(
                         "SELECT id, nome_faturamento, estado FROM lojas WHERE LOWER(nome_faturamento)=LOWER(%s)",
                         (nome,)
@@ -688,11 +697,71 @@ def salvar_loja_manual(rede_id, nome_faturamento, uf):
 
 
 def atualizar_loja(loja_id, rede_id, nome_faturamento, uf):
-    """Atualiza dados de uma loja existente."""
-    _run(
-        "UPDATE lojas SET rede_id=%s, nome_faturamento=%s, estado=%s WHERE id=%s",
-        (rede_id, nome_faturamento, uf, loja_id)
-    )
+    """Atualiza dados de uma loja existente.
+    Se já existe outra loja com o mesmo nome, mescla (move faturamento e deleta a duplicata).
+    """
+    conn = conectar()
+    try:
+        with conn.cursor() as cur:
+            # Verifica se outro registro já tem esse nome_faturamento
+            cur.execute(
+                "SELECT id FROM lojas WHERE LOWER(nome_faturamento)=LOWER(%s) AND id<>%s",
+                (nome_faturamento, loja_id)
+            )
+            dup = cur.fetchone()
+            if dup:
+                dup_id = dup[0]
+                # Move faturamento da duplicata para esta loja
+                cur.execute(
+                    "UPDATE faturamento SET loja_id=%s WHERE loja_id=%s",
+                    (loja_id, dup_id)
+                )
+                # Remove a duplicata
+                cur.execute("DELETE FROM lojas WHERE id=%s", (dup_id,))
+            # Agora atualiza normalmente
+            cur.execute(
+                "UPDATE lojas SET rede_id=%s, nome_faturamento=%s, estado=%s WHERE id=%s",
+                (rede_id, nome_faturamento, uf, loja_id)
+            )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def limpar_lojas_duplicadas():
+    """Remove lojas com nome_faturamento duplicado (LOWER), mantendo a de menor id.
+    Move faturamento das duplicatas para a loja mantida antes de deletar.
+    Retorna número de duplicatas removidas.
+    """
+    conn = conectar()
+    removidos = 0
+    try:
+        with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+            # Encontra grupos duplicados por nome (case-insensitive)
+            cur.execute("""
+                SELECT LOWER(nome_faturamento) AS nome_lower,
+                       array_agg(id ORDER BY id) AS ids
+                FROM lojas
+                GROUP BY LOWER(nome_faturamento)
+                HAVING count(*) > 1
+            """)
+            grupos = cur.fetchall()
+            for g in grupos:
+                ids = g["ids"]
+                manter = ids[0]          # menor id = mais antigo
+                remover = ids[1:]
+                for dup_id in remover:
+                    # Move faturamento
+                    cur.execute(
+                        "UPDATE faturamento SET loja_id=%s WHERE loja_id=%s",
+                        (manter, dup_id)
+                    )
+                    cur.execute("DELETE FROM lojas WHERE id=%s", (dup_id,))
+                    removidos += 1
+        conn.commit()
+    finally:
+        conn.close()
+    return removidos
 
 
 # ── FATURAMENTO ───────────────────────────────────────────────────────────────
@@ -854,18 +923,23 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
     return [dict(r) for r in rows]
 
 
-
 # ── TABELA DE PREÇOS ─────────────────────────────────────────────────────────
 
 def salvar_tabela_precos(rede_id, fabrica_id, items):
+    """
+    Salva/substitui tabela de preços para (rede_id, fabrica_id).
+    items: lista de dicts com {codigo_fab, descricao, unidade, preco}
+    """
     conn = conectar()
     try:
         with conn.cursor() as cur:
+            # Remove entradas antigas desta rede+fábrica
             cur.execute(
                 "DELETE FROM tabela_precos WHERE rede_id=%s AND fabrica_id=%s",
                 (rede_id, fabrica_id)
             )
             for it in items:
+                # Tenta encontrar o produto_id pelo codigo_fab
                 cur.execute(
                     "SELECT id FROM produtos WHERE fabrica_id=%s AND codigo_fab=%s LIMIT 1",
                     (fabrica_id, str(it["codigo_fab"]).strip())
@@ -895,6 +969,7 @@ def salvar_tabela_precos(rede_id, fabrica_id, items):
 
 
 def obter_tabela_precos(rede_id, fabrica_id):
+    """Retorna lista de itens da tabela de preços para (rede_id, fabrica_id)."""
     rows = _fetch("""
         SELECT tp.codigo_fab, tp.descricao, tp.unidade,
                tp.preco, tp.data_atualizacao,
@@ -908,6 +983,7 @@ def obter_tabela_precos(rede_id, fabrica_id):
 
 
 def precos_tabela(rede_id, fabrica_id):
+    """Retorna dict produto_id -> {preco: float, unidade: str} da tabela de preços."""
     rows = _fetch("""
         SELECT produto_id, preco, unidade
         FROM tabela_precos
