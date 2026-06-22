@@ -778,7 +778,7 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             continue
 
         vendas      = banco.vendas_por_produto(fab["id"], rede["id"], data_inicio, data_fim)
-        lojas       = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim)
+        lojas       = banco.vendas_por_loja(fab["id"], rede["id"], data_inicio, data_fim, usar_codigos_rede=mostrar_cod_rede)
         loja_prods  = banco.vendas_por_loja_produto(fab["id"], rede["id"], data_inicio, data_fim)
         precos_fat  = banco.ultimos_precos(fab["id"], rede["id"])
         tab_prec    = banco.precos_tabela(rede["id"], fab["id"])
