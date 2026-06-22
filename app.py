@@ -1458,16 +1458,20 @@ elif pagina == "📥 Importar Faturamento":
                     usar_auto = False
 
                 if not tag_auto or not usar_auto:
-                    cc1, cc2 = st.columns(2)
-                    with cc1:
-                        mes_m = cc1.selectbox("Mês", list(MESES.keys()),
+                    cc0, cc1, cc2 = st.columns([2, 2, 2])
+                    ano_m = cc0.selectbox("Ano", [ano_atual - 2, ano_atual - 1, ano_atual],
+                                          index=1, key=f"ano_{i}")
+                    tipo_periodo = cc1.radio("Período", ["Mês específico", "Ano completo"],
+                                            key=f"tipo_{i}", horizontal=True)
+                    if tipo_periodo == "Mês específico":
+                        mes_m = cc2.selectbox("Mês", list(MESES.keys()),
                                               format_func=lambda x: MESES[x],
                                               index=mes_atual - 1, key=f"mes_{i}")
-                    with cc2:
-                        ano_m = cc2.selectbox("Ano", [ano_atual - 1, ano_atual],
-                                              index=1, key=f"ano_{i}")
-                    tag_final   = f"{ano_m}-{mes_m:02d}"
-                    label_final = f"{MESES[mes_m]}/{ano_m}"
+                        tag_final   = f"{ano_m}-{mes_m:02d}"
+                        label_final = f"{MESES[mes_m]}/{ano_m}"
+                    else:
+                        tag_final   = f"{ano_m}-historico"
+                        label_final = f"Histórico {ano_m} (ano completo)"
                 else:
                     tag_final   = tag_auto
                     label_final = label_auto

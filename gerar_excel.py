@@ -767,12 +767,15 @@ def gerar_relatorio(fab_nome, redes_selecionadas, data_inicio, data_fim):
             continue
 
         prods_cat = banco.produtos_com_codigos(fab["id"], rede["id"])
-        # Se não há códigos cadastrados para esta rede, usa todos os produtos sem CÓD. REDE
-        if not prods_cat:
-            prods_cat = banco.todos_produtos_fabrica(fab["id"])
-            mostrar_cod_rede = False
-        else:
+        if prods_cat:
             mostrar_cod_rede = True
+        else:
+            mostrar_cod_rede = False
+            # Sem codigos_rede: usa apenas produtos que a rede já comprou historicamente
+            prods_cat = banco.produtos_historicos_rede(fab["id"], rede["id"])
+            # Se nunca comprou nada, cai para todos os produtos da fábrica
+            if not prods_cat:
+                prods_cat = banco.todos_produtos_fabrica(fab["id"])
 
         if not prods_cat:
             continue

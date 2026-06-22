@@ -207,9 +207,13 @@ def importar_faturamento(conteudo_bytes, nome_arquivo, callback_progresso=None):
     Retorna dict com estatísticas.
     """
     # Data do período baseada no nome do arquivo (YYYY-MM → YYYY-MM-01)
+    # YYYY-historico → sem data fixa (usa "" para não filtrar por data no relatório)
     try:
         partes = nome_arquivo.split("-")
-        data_periodo = f"{partes[0]}-{partes[1]}-01"
+        if partes[1] == "historico":
+            data_periodo = ""   # arquivo anual: sem data específica
+        else:
+            data_periodo = f"{partes[0]}-{partes[1]}-01"
     except Exception:
         data_periodo = ""
 

@@ -990,6 +990,23 @@ def todos_produtos_fabrica(fabrica_id):
     return [dict(r) for r in rows]
 
 
+def produtos_historicos_rede(fabrica_id, rede_id):
+    """Retorna produtos que a rede já comprou em qualquer período (histórico).
+    Usado para redes sem codigos_rede cadastrados, evitando mostrar toda a fábrica.
+    """
+    rows = _fetch("""
+        SELECT DISTINCT p.*, '' as codigo_rede
+        FROM produtos p
+        JOIN faturamento f ON f.produto_id = p.id
+        JOIN lojas l ON l.id = f.loja_id
+        WHERE p.fabrica_id = %s
+          AND l.rede_id = %s
+          AND f.valor_total > 0
+        ORDER BY p.familia, p.nome
+    """, (fabrica_id, rede_id))
+    return [dict(r) for r in rows]
+
+
 def ultimos_precos(fabrica_id, rede_id):
     """Retorna o último preço unitário faturado por produto_id para a rede."""
     rows = _fetch("""
