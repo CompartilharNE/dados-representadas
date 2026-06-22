@@ -122,7 +122,9 @@ def _norm_forn(v, fabricas):
 
 # ── PARSE HTML-XLS ────────────────────────────────────────────────────────────
 def _parse_html_xls(conteudo_bytes):
-    """Lê arquivo .xls disfarçado de HTML e retorna lista de linhas."""
+    """Lê arquivo .xls disfarçado de HTML e retorna lista de linhas.
+    Suporta formato compacto onde múltiplos pedidos ficam numa mesma <tr>.
+    """
     try:
         html = conteudo_bytes.decode("latin-1", errors="replace")
     except Exception:
@@ -130,10 +132,23 @@ def _parse_html_xls(conteudo_bytes):
     soup = BeautifulSoup(html, "lxml")
     rows = soup.find_all("tr")
     dados = []
+    N_COLS = 14  # número fixo de colunas do relatório
     for r in rows[4:]:
         cells = [td.get_text(strip=True) for td in r.find_all(["td", "th"])]
-        if len(cells) >= 10:
+        n = len(cells)
+        if n < 10:
+            continue
+        if n <= N_COLS:
+            # Linha normal — um pedido por linha
             dados.append(cells)
+        else:
+            # Múltiplos pedidos colados na mesma <tr>
+            # Divide em chunks de N_COLS, descartando fragmentos incompletos
+            for ini in range(0, n - N_COLS + 1, N_COLS):
+                chunk = cells[ini:ini + N_COLS]
+                # Valida que o chunk parece um pedido real (col[0] = número, col[1] = nome cliente)
+                if len(chunk) == N_COLS and chunk[0].isdigit() and chunk[1].strip():
+                    dados.append(chunk)
     return dados
 
 
