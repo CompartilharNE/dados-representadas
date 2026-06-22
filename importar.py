@@ -62,6 +62,10 @@ MAPA_ESTADO = {
     "simões filho": "BA", "simoes filho": "BA", "teixeira de freitas": "BA",
     "valença": "BA", "valenca": "BA", "vitória da conquista": "BA",
     "vitoria da conquista": "BA",
+    # Cidades do interior — BA
+    "barris": "BA", "guanambi": "BA", "itabaiona": "BA", "itapetinga": "BA",
+    "jequie": "BA", "jequié": "BA", "paulo afonso": "BA",
+    "senhor do bonfim": "BA", "serrinha": "BA",
     # Bairros de Salvador — BA
     "barra": "BA", "garibaldi": "BA", "canela": "BA", "iguatemi": "BA",
     "acm": "BA", "brotas": "BA", "boca do rio": "BA", "imbuí": "BA",
@@ -70,6 +74,9 @@ MAPA_ESTADO = {
     "federacao": "BA", "federação": "BA", "uruguai": "BA",
     "cidade baixa": "BA", "nazare": "BA", "nazaré": "BA",
     "ribeira": "BA", "barbalho": "BA", "largo do tanque": "BA",
+    "mussurunga": "BA", "paripe": "BA", "jardim cajazeiras": "BA",
+    "cajazeiras": "BA", "periperi": "BA", "periperi": "BA",
+    "pirajá": "BA", "piraja": "BA", "são caetano": "BA", "sao caetano": "BA",
     # ── SE ───────────────────────────────────────────────────────────────────
     "aracaju": "SE", "nossa senhora do socorro": "SE", "socorro": "SE",
 }
