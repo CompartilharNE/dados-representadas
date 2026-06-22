@@ -971,13 +971,13 @@ def vendas_por_produto(fabrica_id, rede_id, data_inicio, data_fim):
 
 
 def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
+    """Retorna TODAS as lojas da rede, inclusive as que não compraram no período (valor_total=0)."""
     rows = _fetch("""
         SELECT l.id as loja_id, l.nome_faturamento, l.estado,
-               SUM(f.valor_total) as valor_total,
+               COALESCE(SUM(f.valor_total), 0) as valor_total,
                COUNT(DISTINCT CASE WHEN f.valor_total > 0 THEN f.produto_id END) as n_produtos
-        FROM faturamento f
-        JOIN lojas l ON l.id = f.loja_id
-        WHERE l.rede_id=%s
+        FROM lojas l
+        LEFT JOIN faturamento f ON f.loja_id = l.id
           AND f.produto_id IN (
               SELECT cr.produto_id FROM codigos_rede cr
               WHERE cr.rede_id=%s AND cr.ativo=1
@@ -985,10 +985,10 @@ def vendas_por_loja(fabrica_id, rede_id, data_inicio, data_fim):
           )
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido >= %s)
           AND (f.data_pedido = '' OR %s = '' OR f.data_pedido <= %s)
-        GROUP BY f.loja_id, l.id, l.nome_faturamento, l.estado
-        HAVING SUM(f.valor_total) > 0
-        ORDER BY valor_total DESC
-    """, (rede_id, rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim))
+        WHERE l.rede_id=%s
+        GROUP BY l.id, l.nome_faturamento, l.estado
+        ORDER BY valor_total DESC, l.nome_faturamento
+    """, (rede_id, fabrica_id, data_inicio, data_inicio, data_fim, data_fim, rede_id))
     return [dict(r) for r in rows]
 
 
