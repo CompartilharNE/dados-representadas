@@ -1,7 +1,7 @@
 """
 banco.py — Operacoes do banco PostgreSQL (Supabase)
 Compartilhar NE — Dados Representadas
-v2
+v2.1
 """
 import psycopg2
 import psycopg2.extras
