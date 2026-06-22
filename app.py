@@ -266,6 +266,11 @@ if pagina == "🗂️ Gerar Relatório":
                     if not rede:
                         continue
                     prods = banco.produtos_com_codigos(fab["id"], rede["id"])
+                    usar_cod = bool(prods)
+                    if not prods:
+                        prods = banco.produtos_historicos_rede(fab["id"], rede["id"])
+                    if not prods:
+                        prods = banco.todos_produtos_fabrica(fab["id"])
                     vendas = banco.vendas_por_produto(fab["id"], rede["id"], str(d_ini), str(d_fim))
                     comp   = sum(1 for p in prods if vendas.get(p["id"], {}).get("valor_total", 0) > 0)
                     ncomp  = len(prods) - comp
